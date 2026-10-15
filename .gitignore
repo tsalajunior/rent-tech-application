@@ -1,0 +1,21 @@
+# --- Python / Django ---
+*.py[cod]
+*$py.class
+__pycache__/
+db.sqlite3
+media/
+staticfiles/
+
+# --- Environnement ---
+.env
+venv/
+env/
+
+# --- Docker ---
+.docker/
+
+# --- IDE (VS Code / PyCharm) ---
+.idea/
+.vscode/
+*.swp
+*.swo

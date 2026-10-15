@@ -1,0 +1,12 @@
+Le fichier de configuration Git (.gitignore)
+Ce fichier permet d'éviter de versionner les fichiers sensibles ou générés automatiquement 
+(comme les données de la base de données ou les variables d'environnement).
+
+Le fichier des variables d'environnement (.env)
+Pour des raisons de sécurité et de propreté, les identifiants de la base de données 
+ne doivent pas être en dur dans le code.
+
+Le fichier Docker Compose (docker-compose.yml)
+Puisque vous êtes sous Windows 10 avec Docker Desktop, nous allons configurer le conteneur 
+PostgreSQL (version Alpine pour être léger sur le disque).
+
