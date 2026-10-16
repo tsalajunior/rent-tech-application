@@ -1,0 +1,8 @@
+core/
+├── templates/
+│   └── core/
+│       ├── atoms/       # Petits éléments (boutons, inputs, badges)
+│       ├── molecules/   # Blocs combinés (cartes d'équipement, lignes de tableau)
+│       ├── organisms/   # Sections complexes (navigation, formulaires de location)
+│       ├── templates/   # Layouts de page globaux (base.html avec Tailwind)
+│       └── pages/       # Vues finales rendues (dashboard, liste_clients, recu_location)

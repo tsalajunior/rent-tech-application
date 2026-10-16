@@ -10,3 +10,7 @@ Le fichier Docker Compose (docker-compose.yml)
 Puisque vous êtes sous Windows 10 avec Docker Desktop, nous allons configurer le conteneur 
 PostgreSQL (version Alpine pour être léger sur le disque).
 
+
+superadmin : stephane - stephane
+
+views - urls - forms - templates
