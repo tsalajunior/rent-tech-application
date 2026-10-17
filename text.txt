@@ -14,3 +14,9 @@ PostgreSQL (version Alpine pour être léger sur le disque).
 superadmin : stephane - stephane
 
 views - urls - forms - templates
+
+
+agences
+
+La page de liste des équipements et sa mise en forme
+Le formulaire et la logique pour enregistrer une nouvelle location

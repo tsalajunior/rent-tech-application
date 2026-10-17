@@ -1,3 +1,9 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-renttech-dark: #1E1A4D;
+  --color-renttech-primary: #193CB8;
+  --color-renttech-lightblue: #155DFC;
+  --color-renttech-offwhite: #FAFAF9;
+  --color-renttech-darktext: #1C1917;
+}

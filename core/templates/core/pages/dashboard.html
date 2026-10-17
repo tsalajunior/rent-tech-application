@@ -1,0 +1,61 @@
+{% extends 'core/templates/base.html' %}
+
+{% block title %}RentTech - Tableau de bord{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- En-tête de la page -->
+    <div class="bg-white shadow rounded-lg p-6 flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold text-renttech-dark">Tableau de bord de l'Agence</h1>
+            <p class="text-gray-600">Bienvenue sur la plateforme de gestion RentTech.</p>
+        </div>
+        <div>
+            <span
+                class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-renttech-primary">
+                Session Active (Employé)
+            </span>
+        </div>
+    </div>
+
+    <!-- Statistiques / Chiffres clés -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Carte 1 : Clients -->
+        <div class="bg-white shadow rounded-lg p-6 border-l-4 border-renttech-primary">
+            <p class="text-sm font-medium text-gray-500 uppercase">Clients enregistrés</p>
+            <p class="mt-2 text-3xl font-extrabold text-renttech-dark">{{ total_clients }}</p>
+        </div>
+
+        <!-- Carte 2 : Équipements -->
+        <div class="bg-white shadow rounded-lg p-6 border-l-4 border-renttech-lightblue">
+            <p class="text-sm font-medium text-gray-500 uppercase">Équipements au catalogue</p>
+            <p class="mt-2 text-3xl font-extrabold text-renttech-dark">{{ total_equipements }}</p>
+        </div>
+
+        <!-- Carte 3 : Locations en cours -->
+        <div class="bg-white shadow rounded-lg p-6 border-l-4 border-amber-500">
+            <p class="text-sm font-medium text-gray-500 uppercase">Locations en cours</p>
+            <p class="mt-2 text-3xl font-extrabold text-renttech-dark">{{ locations_en_cours }}</p>
+        </div>
+    </div>
+
+    <!-- Section d'actions rapides -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-lg font-semibold text-renttech-dark mb-4">Actions Rapides</h2>
+        <div class="flex flex-wrap gap-4">
+            <a href="{% url 'core:liste_equipements' %}"
+                class="bg-renttech-primary hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium transition">
+                Voir les équipements
+            </a>
+            <a href="{% url 'core:liste_clients' %}"
+                class="bg-renttech-dark hover:bg-gray-800 text-white px-4 py-2 rounded-md font-medium transition">
+                Gérer les clients
+            </a>
+            <a href="/admin/" target="_blank"
+                class="bg-gray-200 hover:bg-gray-300 text-renttech-darktext px-4 py-2 rounded-md font-medium transition">
+                Accéder à l'Admin Django
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

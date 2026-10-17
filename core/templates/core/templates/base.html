@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}RentTech - Plateforme de Location{% endblock %}</title>
     {% load static %}
+    <link rel="icon" href="{% static 'core/images/RentTech_Logo.jpg' %}" type="image/jpg">
     <!-- Fichier CSS compilé par Tailwind -->
     <link rel="stylesheet" href="{% static 'core/css/output.css' %}">
 </head>
@@ -15,9 +16,10 @@
     <!-- En-tête / Navigation -->
     <header class="bg-renttech-dark text-white shadow-md">
         <div class="container mx-auto px-4 py-4 flex justify-between items-center">
-            <div class="flex items-center space-x-3">
-                <span class="text-2xl font-bold tracking-wider text-renttech-lightblue">Rent<span
-                        class="text-white">Tech</span></span>
+            <div class="">
+                <a href="{% url 'core:dashboard' %}">
+                    <img src="{% static 'core/images/RentTech_Logo.jpg' %}" alt="Logo RentTech" height="50" width="50" class="rounded-full">
+                </a>
             </div>
             <nav class="space-x-4">
                 <a href="{% url 'core:dashboard' %}" class="hover:text-renttech-lightblue transition">Tableau de
