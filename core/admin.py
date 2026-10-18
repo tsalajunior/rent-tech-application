@@ -1,5 +1,7 @@
 from django.contrib import admin
-from .models import Agence, Categorie, Equipement, Client, Location, LocationEquipement
+from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.models import User
+from .models import Agence, Categorie, Equipement, Client, Location, LocationEquipement, ProfilEmploye
 
 
 @admin.register(Agence)
@@ -27,9 +29,9 @@ class ClientAdmin(admin.ModelAdmin):
     search_fields = ("nom", "prenom", "email", "telephone")
 
 
-class LocationEquipementInline(admin.TabularInline):
-    model = LocationEquipement
-    extra = 1
+# class LocationEquipementInline(admin.TabularInline):
+#     model = LocationEquipement
+#     extra = 1
 
 
 @admin.register(Location)
@@ -46,14 +48,33 @@ class LocationAdmin(admin.ModelAdmin):
         "date_creation",
     )
     list_filter = ("agence", "date_debut", "date_creation")
-    search_fields = ("client__nom", "client__prenom", "client__email")
-    inlines = [LocationEquipementInline]
+    search_fields = ("client__nom", "client__prenom", "client__email", 'employe__username')
+    # inlines = [LocationEquipementInline]
 
 
 @admin.register(LocationEquipement)
 class LocationEquipementAdmin(admin.ModelAdmin):
     list_display = ("location", "equipement", "prix_journalier_applique")
-    list_filter = ('equipement', 'location__agence')
-    search_fields = ('equipement__nom', 'equipement__reference')
+    list_filter = ("equipement", "location__agence")
+    search_fields = ("equipement__nom", "equipement__reference")
 
 
+# --- Gestion des Profils Employés liés aux Agences ---
+
+class ProfilEmployeInline(admin.StackedInline):
+    """
+    Permet d'afficher et de modifier l'agence de l'employé directement
+    depuis la page de modification d'un utilisateur dans l'admin Django.
+    """
+    model = ProfilEmploye
+    can_delete = False
+    verbose_name_plural = 'Profil Agence'
+
+# On décoche l'UserAdmin par défaut de Django pour y inclure notre inline d'agence
+class CustomUserAdmin(UserAdmin):
+    inlines = (ProfilEmployeInline,)
+
+
+# On désenregistre l'User par défaut pour réenregistrer notre version enrichie
+admin.site.unregister(User)
+admin.site.register(User, CustomUserAdmin)

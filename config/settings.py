@@ -45,6 +45,8 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "config.urls"
 
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -116,7 +118,7 @@ STATIC_URL = "static/"
 STATICFILES_DIRS = [
     BASE_DIR / "core/static",
 ]
-
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
@@ -126,3 +128,7 @@ MAILERS = {
         "BACKEND": "django.core.mail.backends.console.EmailBackend",
     },
 }
+
+# Redirection après la connexion vers la racine (le tableau de bord)
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = 'login'

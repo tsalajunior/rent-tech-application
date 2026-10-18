@@ -1,42 +1,91 @@
 from django.shortcuts import render
-from .models import Equipement, Client, Location, Agence
+from django.contrib.auth.decorators import login_required
+from .models import Equipement, Client, Location
 
 
-def dashboard(views_request):
+@login_required
+def dashboard(request):
     """
-    Vue du tableau de bord de l'employé au comptoir.
+    Tableau de bord dynamique :
+    - Vue globale pour l'administrateur principal.
+    - Vue filtrée par agence pour l'employé simple.
     """
-    total_clients = Client.objects.count()
-    total_equipements = Equipement.objects.count()
-    locations_en_cours = Location.objects.filter(retour_reelle__isnull=True).count()
+    user = request.user
+
+    if user.is_superuser:
+        # Vue globale SuperAdmin
+        total_clients = Client.objects.count()
+        total_equipements = Equipement.objects.count()
+        locations_en_cours = Location.objects.filter(retour_reelle__isnull=True).count()
+        agence_libelle = "Administration Centrale (Toutes les Agences)"
+    else:
+        # Vue restreinte à l'agence de l'employé
+        try:
+            employe_agence = user.profil.agence
+        except AttributeError:
+            employe_agence = None
+
+        if employe_agence:
+            # Filtrage strict par agence
+            total_equipements = Equipement.objects.filter(agence=employe_agence).count()
+            locations_en_cours = Location.objects.filter(
+                agence=employe_agence, retour_reelle__isnull=True
+            ).count()
+            # Clients ayant effectué une location dans cette agence
+            total_clients = (
+                Client.objects.filter(locations__agence=employe_agence)
+                .distinct()
+                .count()
+            )
+            agence_libelle = f"Agence de {employe_agence.ville} ({employe_agence.nom})"
+        else:
+            total_equipements = 0
+            locations_en_cours = 0
+            total_clients = 0
+            agence_libelle = "Aucune agence assignée"
 
     context = {
         "total_clients": total_clients,
         "total_equipements": total_equipements,
         "locations_en_cours": locations_en_cours,
+        "agence_libelle": agence_libelle,
     }
-    return render(views_request, "core/pages/dashboard.html", context)
+    return render(request, "core/pages/dashboard.html", context)
 
 
-def liste_equipements(views_request):
+@login_required
+def liste_equipements(request):
     """
-    Vue listant tous les équipements disponibles dans les agences.
+    Catalogue des équipements filtré par agence pour les employés.
     """
-    equipements = Equipement.objects.all()
-    context = {
-        "equipements": equipements,
-    }
-    return render(views_request, "core/pages/liste_equipements.html", context)
+    user = request.user
+    if user.is_superuser:
+        equipements = Equipement.objects.all()
+    else:
+        try:
+            employe_agence = user.profil.agence
+            equipements = Equipement.objects.filter(agence=employe_agence)
+        except AttributeError:
+            equipements = Equipement.objects.none()
+
+    return render(
+        request, "core/pages/liste_equipements.html", {"equipements": equipements}
+    )
 
 
-def liste_clients(views_request):
+@login_required
+def liste_clients(request):
     """
-    Vue listant les clients enregistrés.
+    Liste des clients filtrée par agence pour les employés.
     """
-    clients = Client.objects.all()
-    context = {
-        "clients": clients,
-    }
-    return render(views_request, "core/pages/liste_clients.html", context)
+    user = request.user
+    if user.is_superuser:
+        clients = Client.objects.all()
+    else:
+        try:
+            employe_agence = user.profil.agence
+            clients = Client.objects.filter(locations__agence=employe_agence).distinct()
+        except AttributeError:
+            clients = Client.objects.none()
 
-
+    return render(request, "core/pages/liste_clients.html", {"clients": clients})

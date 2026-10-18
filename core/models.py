@@ -96,6 +96,7 @@ class LocationEquipement(models.Model):
     """
     Modèle représentant la relation entre une location et un équipement.
     """
+
     location = models.ForeignKey(
         Location, on_delete=models.CASCADE, related_name="lignes_location"
     )
@@ -108,3 +109,20 @@ class LocationEquipement(models.Model):
 
     def __str__(self):
         return f"Location {self.location.id} -> Équipement {self.equipement.nom}"
+
+
+class ProfilEmploye(models.Model):
+    """
+    Modèle représentant le profil d'un employé.
+    """
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profil")
+    agence = models.ForeignKey(
+        "Agence",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="employes",
+    )
+
+    def __str__(self):
+        return f"{self.user.username} - Agence: {self.agence.nom if self.agence else 'Aucune'}"
