@@ -22,3 +22,5 @@ La page de liste des équipements et sa mise en forme
 Le formulaire et la logique pour enregistrer une nouvelle location
 
 tsala - wxcvbnwx
+
+docker exec -it renttech_web_container python manage.py collectstatic --noinput

@@ -1,47 +1,50 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="fr">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}RentTech - Plateforme de Location{% endblock %}</title>
-    {% load static %}
-    <link rel="icon" href="{% static 'core/images/RentTech_Logo.jpg' %}" type="image/jpg">
-    <!-- Fichier CSS compilé par Tailwind -->
-    <link rel="stylesheet" href="{% static 'core/css/output.css' %}">
+    <title>{% block title %}RentTech{% endblock %}</title>
+    <!-- Utilisation temporaire du CDN Tailwind validé ou du CSS compilé -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" type="image/jpg" href="{% static 'images/RentTech_Logo.jpg' %}">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        renttech: {
+                            dark: '#0f172a',
+                            primary: '#2563eb',
+                            lightblue: '#38bdf8',
+                            offwhite: '#f8fafc',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
 </head>
 
-<body class="bg-renttech-offwhite text-renttech-darktext font-sans antialiased min-h-screen flex flex-col">
+<body class="bg-renttech-offwhite text-gray-800 font-sans antialiased min-h-screen flex flex-col justify-between">
 
-    <!-- En-tête / Navigation -->
-    <header class="bg-renttech-dark text-white shadow-md">
-        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
-            <div class="">
-                <a href="{% url 'core:dashboard' %}">
-                    <img src="{% static 'core/images/RentTech_Logo.jpg' %}" alt="Logo RentTech" height="50" width="50" class="rounded-full">
-                </a>
-            </div>
-            <nav class="space-x-4">
-                <a href="{% url 'core:dashboard' %}" class="hover:text-renttech-lightblue transition">Tableau de
-                    bord</a>
-                <a href="{% url 'core:liste_equipements' %}"
-                    class="hover:text-renttech-lightblue transition">Équipements</a>
-                <a href="{% url 'core:liste_clients' %}" class="hover:text-renttech-lightblue transition">Clients</a>
-            </nav>
-        </div>
-    </header>
+    <!-- Organisme : Barre de navigation -->
+    {% include 'core/organisms/navbar.html' %}
 
-    <!-- Contenu Principal -->
-    <main class="flex-grow container mx-auto px-4 py-8">
-        {% block content %}
-        {% endblock %}
+    <!-- Contenu dynamique de la Page -->
+    <main class="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
+        {% block content %}{% endblock %}
     </main>
 
     <!-- Pied de page -->
-    <footer class="bg-renttech-dark text-white py-4 text-center text-sm">
-        <p>&copy; 2026 RentTech - Logiciel de Gestion d'Agence.</p>
+    <footer class="bg-renttech-dark text-gray-400 text-center py-4 text-xs">
+        &copy; 2026 RentTech - Logiciel de Gestion d'Agence. Tous droits réservés.
+        Développé par <a href="https://www.linkedin.com/in/stephane-tsala" target="_blank"
+            class="text-renttech-lightblue hover:text-renttech-primary transition">Stéphane Tsala</a>.
     </footer>
-
+    <!-- Inclusion du gardien de session anti-cache -->
+    {% include 'core/atoms/session_guard.html' %}
 </body>
 
 </html>

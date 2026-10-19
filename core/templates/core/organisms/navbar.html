@@ -1,0 +1,24 @@
+{% load static %}
+
+<nav class="bg-renttech-dark text-white shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-16 items-center">
+            <div class="flex items-center space-x-3">
+                <a href="{% url 'core:dashboard' %}">
+                    <img class="h-10 rounded-md w-auto" src="{% static 'core/images/RentTech_Logo.jpg' %}" alt="RentTech_Logo">
+                </a>
+            </div>
+            <div class="flex space-x-6 text-sm font-medium">
+                <a href="{% url 'core:dashboard' %}" class="hover:text-renttech-lightblue transition">Tableau de
+                    bord</a>
+                <a href="{% url 'core:liste_equipements' %}"
+                    class="hover:text-renttech-lightblue transition">Équipements</a>
+                <a href="{% url 'core:liste_clients' %}" class="hover:text-renttech-lightblue transition">Clients</a>
+                <form action="{% url 'logout' %}" method="post" class="inline">
+                    {% csrf_token %}
+                    <button type="submit" class="text-red-400 hover:text-red-300 transition">Déconnexion</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</nav>

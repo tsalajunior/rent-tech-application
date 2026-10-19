@@ -1,0 +1,26 @@
+<!-- Atome : Gardien de session intelligent et anti-retour non sécurisé -->
+<script>
+    window.addEventListener('pageshow', function (event) {
+        // Si la page est chargée depuis l'historique (bouton Précédent ou Suivant)
+        if (event.persisted) {
+            // Option 1 : Forcer un rechargement complet pour obliger Django à revalider le @login_required
+            window.location.reload();
+        }
+    });
+
+    // Option 2 : Vérification active si la page redevient visible (changement d'onglet ou retour de navigation)
+    document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible') {
+            // On peut optionnellement effectuer une vérification légère ou simplement recharger 
+            // pour garantir que la session n'a pas expirée entre-temps.
+            fetch(window.location.href, { method: 'HEAD' })
+                .then(response => {
+                    // Si le serveur redirige (par exemple vers /login/), on force la redirection côté client
+                    if (response.redirected || response.url.includes('/login/')) {
+                        window.location.href = response.url;
+                    }
+                })
+                .catch(() => { });
+        }
+    });
+</script>

@@ -1,9 +1,11 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from .models import Equipement, Client, Location
+from django.views.decorators.cache import never_cache
 
 
 @login_required
+@never_cache
 def dashboard(request):
     """
     Tableau de bord dynamique :
@@ -54,6 +56,7 @@ def dashboard(request):
 
 
 @login_required
+@never_cache
 def liste_equipements(request):
     """
     Catalogue des équipements filtré par agence pour les employés.
@@ -74,6 +77,7 @@ def liste_equipements(request):
 
 
 @login_required
+@never_cache
 def liste_clients(request):
     """
     Liste des clients filtrée par agence pour les employés.

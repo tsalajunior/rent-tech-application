@@ -4,55 +4,30 @@
 
 {% block content %}
 <div class="space-y-6">
-    <!-- En-tête de la page avec indicateur de rôle/agence -->
+    <!-- En-tête -->
     <div class="bg-white shadow rounded-lg p-6 flex justify-between items-center">
         <div>
             <h1 class="text-2xl font-bold text-renttech-dark">Tableau de bord</h1>
             <p class="text-gray-600">Espace de gestion de comptoir RentTech.</p>
         </div>
         <div>
-            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-renttech-primary">
-                {{ agence_libelle }}
-            </span>
+            {% include 'core/atoms/badge.html' with text=agence_libelle bg_color="bg-blue-100" text_color="text-renttech-primary" %}
         </div>
     </div>
 
-    <!-- Statistiques / Chiffres clés -->
+    <!-- Grille de Statistiques (Utilisation de la Molécule stat_card) -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <!-- Carte 1 : Clients -->
-        <div class="bg-white shadow rounded-lg p-6 border-l-4 border-renttech-primary">
-            <p class="text-sm font-medium text-gray-500 uppercase">Clients de l'agence</p>
-            <p class="mt-2 text-3xl font-extrabold text-renttech-dark">{{ total_clients }}</p>
-        </div>
-
-        <!-- Carte 2 : Équipements -->
-        <div class="bg-white shadow rounded-lg p-6 border-l-4 border-renttech-lightblue">
-            <p class="text-sm font-medium text-gray-500 uppercase">Équipements en stock</p>
-            <p class="mt-2 text-3xl font-extrabold text-renttech-dark">{{ total_equipements }}</p>
-        </div>
-
-        <!-- Carte 3 : Locations en cours -->
-        <div class="bg-white shadow rounded-lg p-6 border-l-4 border-amber-500">
-            <p class="text-sm font-medium text-gray-500 uppercase">Locations en cours</p>
-            <p class="mt-2 text-3xl font-extrabold text-renttech-dark">{{ locations_en_cours }}</p>
-        </div>
+        {% include 'core/molecules/stat_card.html' with title="Clients de l'agence" value=total_clients border_color="border-renttech-primary" %}
+        {% include 'core/molecules/stat_card.html' with title="Équipements en stock" value=total_equipements border_color="border-renttech-lightblue" %}
+        {% include 'core/molecules/stat_card.html' with title="Locations en cours" value=locations_en_cours border_color="border-amber-500" %}
     </div>
 
-    <!-- Section d'actions rapides -->
+    <!-- Actions Rapides (Utilisation des Atomes boutons) -->
     <div class="bg-white shadow rounded-lg p-6">
         <h2 class="text-lg font-semibold text-renttech-dark mb-4">Actions Rapides</h2>
         <div class="flex flex-wrap gap-4">
-            <a href="{% url 'core:liste_equipements' %}" class="bg-renttech-primary hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium transition">
-                Voir les équipements
-            </a>
-            <a href="{% url 'core:liste_clients' %}" class="bg-renttech-dark hover:bg-gray-800 text-white px-4 py-2 rounded-md font-medium transition">
-                Gérer les clients
-            </a>
-            {% if request.user.is_superuser %}
-            <a href="/admin/" target="_blank" class="bg-gray-200 hover:bg-gray-300 text-renttech-darktext px-4 py-2 rounded-md font-medium transition">
-                Administration Django
-            </a>
-            {% endif %}
+            {% include 'core/atoms/button.html' with href_url="core:liste_equipements" label="Voir les équipements" color="renttech-primary" %}
+            {% include 'core/atoms/button.html' with href_url="core:liste_clients" label="Gérer les clients" color="renttech-dark" %}
         </div>
     </div>
 </div>

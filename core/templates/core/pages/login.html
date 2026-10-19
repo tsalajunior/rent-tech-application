@@ -79,7 +79,13 @@
             &copy; 2026 RentTech - Tous droits réservés.
         </div>
     </div>
-
+    <!-- Script de sécurité anti-historique de connexion -->
+    <script>
+        // Si l'URL contient ?next=, on nettoie l'historique pour éviter les boucles de redirection
+        if (window.history.replaceState) {
+            window.history.replaceState(null, null, window.location.pathname);
+        }
+    </script>
 </body>
 
 </html>
