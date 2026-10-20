@@ -18,8 +18,8 @@ class CategorieAdmin(admin.ModelAdmin):
 
 @admin.register(Equipement)
 class EquipementAdmin(admin.ModelAdmin):
-    list_display = ("reference", "nom", "prix_journalier", "categorie", "agence")
-    list_filter = ("categorie", "agence")
+    list_display = ("reference", "nom", "prix_journalier", "categorie", "agence", "statut")
+    list_filter = ("categorie", "agence", "statut")
     search_fields = ("reference", "nom")
 
 

@@ -10,7 +10,8 @@
             <h1 class="text-2xl font-bold text-renttech-dark">Tableau de bord</h1>
             <p class="text-gray-600">Espace de gestion de comptoir RentTech.</p>
         </div>
-        <div>
+        <div class="flex flex-wrap items-center gap-3">
+            {% include 'core/atoms/user_badge.html' %}
             {% include 'core/atoms/badge.html' with text=agence_libelle bg_color="bg-blue-100" text_color="text-renttech-primary" %}
         </div>
     </div>
@@ -26,8 +27,8 @@
     <div class="bg-white shadow rounded-lg p-6">
         <h2 class="text-lg font-semibold text-renttech-dark mb-4">Actions Rapides</h2>
         <div class="flex flex-wrap gap-4">
-            {% include 'core/atoms/button.html' with href_url="core:liste_equipements" label="Voir les équipements" color="renttech-primary" %}
-            {% include 'core/atoms/button.html' with href_url="core:liste_clients" label="Gérer les clients" color="renttech-dark" %}
+            {% include 'core/atoms/button.html' with href="/equipements/" label="Voir les équipements" color="renttech-primary" %}
+            {% include 'core/atoms/button.html' with href="/clients/" label="Gérer les clients" color="renttech-dark" %}
         </div>
     </div>
 </div>

@@ -1,0 +1,11 @@
+<!-- Atome : Indicateur de l'utilisateur connecté -->
+<div class="flex items-center space-x-2 text-sm text-gray-600 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
+    <svg class="w-4 h-4 text-renttech-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+    </svg>
+    <span class="font-medium text-renttech-dark">{{ user.username }}</span>
+    {% if user.is_superuser %}
+    <span class="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-semibold">Admin</span>
+    {% endif %}
+</div>

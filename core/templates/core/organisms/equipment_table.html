@@ -1,0 +1,48 @@
+<div class="bg-white shadow rounded-lg overflow-hidden border border-gray-100">
+    <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+        <h2 class="text-lg font-bold text-renttech-dark">Parc des équipements</h2>
+        <!-- Bouton d'ajout d'un nouvel équipement -->
+        <a href="#"
+            class="bg-renttech-primary hover:opacity-90 text-white px-4 py-2 rounded-md text-sm font-medium transition shadow-sm">
+            + Nouvel équipement
+        </a>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th scope="col"
+                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Référence
+                    </th>
+                    <th scope="col"
+                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nom /
+                        Modèle</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Catégorie</th>
+                    <th scope="col"
+                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Agence
+                    </th>
+                    <th scope="col"
+                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut
+                    </th>
+                    <th scope="col"
+                        class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions
+                    </th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% if equipements %}
+                {% for equipement in equipements %}
+                {% include 'core/molecules/equipment_row.html' with equipement=equipement %}
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="5" class="px-6 py-10 text-center text-sm text-gray-500">
+                        Aucun équipement trouvé pour votre agence.
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>

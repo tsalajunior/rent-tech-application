@@ -1,0 +1,9 @@
+{% if statut == 'disponible' %}
+<span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800">Disponible</span>
+{% elif statut == 'loue' %}
+<span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">Loué</span>
+{% elif statut == 'maintenance' %}
+<span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">En maintenance</span>
+{% else %}
+<span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">Inconnu</span>
+{% endif %}

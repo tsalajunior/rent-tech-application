@@ -31,11 +31,21 @@ class Equipement(models.Model):
     Modèle représentant un équipement.
     """
 
+    # Choix de statuts pour un équipement de location
+    STATUT_CHOICES = [
+        ("disponible", "Disponible"),
+        ("loue", "Loué"),
+        ("maintenance", "En maintenance"),
+    ]
+
     reference = models.CharField(max_length=50, unique=True)
     nom = models.CharField(max_length=150)
     prix_journalier = models.DecimalField(
         max_digits=10, decimal_places=2
     )  # Coût de location par jour
+    statut = models.CharField(
+        max_length=20, choices=STATUT_CHOICES, default="disponible"
+    )
     categorie = models.ForeignKey(
         Categorie, on_delete=models.CASCADE, related_name="equipements"
     )
@@ -115,6 +125,7 @@ class ProfilEmploye(models.Model):
     """
     Modèle représentant le profil d'un employé.
     """
+
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profil")
     agence = models.ForeignKey(
         "Agence",
