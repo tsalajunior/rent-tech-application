@@ -1,13 +1,27 @@
 <div class="bg-white shadow rounded-lg overflow-hidden border border-gray-100">
-    <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+    <!-- En-tête avec barre de recherche dynamique et bouton d'ajout -->
+    <div class="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
         <h2 class="text-lg font-bold text-renttech-dark">Parc des équipements</h2>
-        <!-- Bouton d'ajout d'un nouvel équipement -->
+
+        <!-- Formulaire de recherche dynamique -->
+        <form method="GET" action="" id="searchForm" class="flex items-center gap-2 w-full md:w-auto">
+            <input type="text" name="q" id="searchInput" value="{{ query }}" placeholder="Rechercher réf, nom, cat..."
+                class="px-4 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-renttech-primary focus:outline-none w-full md:w-72"
+                autocomplete="off">
+            {% if query %}
+            <a href="{% url 'core:liste_equipements' %}"
+                class="text-gray-500 hover:text-gray-700 text-xs underline whitespace-nowrap">Réinitialiser</a>
+            {% endif %}
+        </form>
+
+        <!-- Bouton Nouvel équipement -->
         <a href="#"
-            class="bg-renttech-primary hover:opacity-90 text-white px-4 py-2 rounded-md text-sm font-medium transition shadow-sm">
+            class="bg-renttech-primary hover:opacity-90 text-white px-4 py-2 rounded-md text-sm font-medium transition shadow-sm whitespace-nowrap">
             + Nouvel équipement
         </a>
     </div>
 
+    <!-- Tableau -->
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
@@ -18,7 +32,9 @@
                     <th scope="col"
                         class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nom /
                         Modèle</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Catégorie</th>
+                    <th scope="col"
+                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Catégorie
+                    </th>
                     <th scope="col"
                         class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Agence
                     </th>
@@ -37,12 +53,31 @@
                 {% endfor %}
                 {% else %}
                 <tr>
-                    <td colspan="5" class="px-6 py-10 text-center text-sm text-gray-500">
-                        Aucun équipement trouvé pour votre agence.
+                    <td colspan="6" class="px-6 py-12 text-center text-sm text-gray-500">
+                        Aucun équipement trouvé {% if query %} pour la recherche "<span class="font-semibold">{{ query
+                            }}</span>"{% endif %}.
                     </td>
                 </tr>
                 {% endif %}
             </tbody>
         </table>
     </div>
+
+    <!-- Pagination -->
+    {% include 'core/molecules/pagination.html' %}
 </div>
+
+<!-- Script de recherche dynamique en temps réel -->
+<script>
+    const searchInput = document.getElementById('searchInput');
+    const searchForm = document.getElementById('searchForm');
+    let typingTimer;
+    const doneTypingInterval = 400; // Délai de 400ms après la dernière frappe pour éviter de spammer le serveur
+
+    searchInput.addEventListener('input', function () {
+        clearTimeout(typingTimer);
+        typingTimer = setTimeout(function () {
+            searchForm.submit();
+        }, doneTypingInterval);
+    });
+</script>

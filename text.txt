@@ -32,6 +32,7 @@ docker exec -it renttech_web_container python manage.py makemigrations
 # 2. Appliquer la migration dans la base de données
 docker exec -it renttech_web_container python manage.py migrate
 
+
+* pagination eqmt 10 par page et barre de recherche ✅
 * qte pour un eqmt
 * mod & supp eqmt pour admin 
-* pagination eqmt 10 par page

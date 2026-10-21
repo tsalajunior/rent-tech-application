@@ -2,6 +2,8 @@ from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from .models import Equipement, Client, Location
 from django.views.decorators.cache import never_cache
+from django.core.paginator import Paginator
+from django.db.models import Q
 
 
 @login_required
@@ -62,6 +64,9 @@ def liste_equipements(request):
     Catalogue des équipements filtré par agence pour les employés.
     """
     user = request.user
+    query = request.GET.get("q", "")
+
+    # 1. Filtrage initial selon le cloisonnement agence / superuser
     if user.is_superuser:
         equipements = Equipement.objects.all()
     else:
@@ -71,9 +76,27 @@ def liste_equipements(request):
         except AttributeError:
             equipements = Equipement.objects.none()
 
-    return render(
-        request, "core/pages/liste_equipements.html", {"equipements": equipements}
-    )
+    # 2. Filtrage dynamique par la barre de recherche (Référence, Nom ou Catégorie)
+    if query:
+        equipements = equipements.filter(
+            Q(reference__icontains=query)
+            | Q(nom__icontains=query)
+            | Q(categorie__nom__icontains=query)
+        )
+
+    # Tri par ordre décroissant (les plus récents en premier)
+    equipements = equipements.order_by("-id")
+
+    # 3. Pagination : 10 éléments par page
+    paginator = Paginator(equipements, 10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        "equipements": page_obj,  # On transmet l'objet de pagination au template
+        "query": query,
+    }
+    return render(request, "core/pages/liste_equipements.html", context)
 
 
 @login_required
