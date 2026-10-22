@@ -1,0 +1,39 @@
+{% extends 'core/templates/base.html' %}
+
+{% block title %}RentTech - Supprimer l'équipement{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto bg-white shadow rounded-lg p-8 border border-gray-100 mt-10">
+    <div class="flex items-center space-x-3 mb-6">
+        <div class="p-3 bg-red-100 text-red-600 rounded-full">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+                </path>
+            </svg>
+        </div>
+        <div>
+            <h1 class="text-xl font-bold text-renttech-dark">Confirmation de suppression</h1>
+            <p class="text-gray-500 text-sm">Cette action est définitive et irréversible.</p>
+        </div>
+    </div>
+
+    <div class="bg-gray-50 rounded-lg p-4 mb-6 border border-gray-200 text-sm space-y-2">
+        <p><span class="font-semibold text-gray-700">Référence :</span> {{ equipement.reference }}</p>
+        <p><span class="font-semibold text-gray-700">Nom :</span> {{ equipement.nom }}</p>
+        <p><span class="font-semibold text-gray-700">Agence :</span> {{ equipement.agence.nom }}</p>
+    </div>
+
+    <form method="POST" class="flex justify-end space-x-4">
+        {% csrf_token %}
+        <a href="{% url 'core:liste_equipements' %}"
+            class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm font-medium transition">
+            Annuler
+        </a>
+        <button type="submit"
+            class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition shadow-sm">
+            Confirmer la suppression
+        </button>
+    </form>
+</div>
+{% endblock %}

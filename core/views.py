@@ -4,6 +4,8 @@ from .models import Equipement, Client, Location
 from django.views.decorators.cache import never_cache
 from django.core.paginator import Paginator
 from django.db.models import Q
+from django.shortcuts import get_object_or_404, redirect
+from .forms import EquipementForm
 
 
 @login_required
@@ -60,11 +62,9 @@ def dashboard(request):
 @login_required
 @never_cache
 def liste_equipements(request):
-    """
-    Catalogue des équipements filtré par agence pour les employés.
-    """
     user = request.user
     query = request.GET.get("q", "")
+    sort_by = request.GET.get("sort", "-id")  # Tri par défaut (les plus récents)
 
     # 1. Filtrage initial selon le cloisonnement agence / superuser
     if user.is_superuser:
@@ -76,7 +76,7 @@ def liste_equipements(request):
         except AttributeError:
             equipements = Equipement.objects.none()
 
-    # 2. Filtrage dynamique par la barre de recherche (Référence, Nom ou Catégorie)
+    # 2. Filtrage dynamique par la barre de recherche
     if query:
         equipements = equipements.filter(
             Q(reference__icontains=query)
@@ -84,17 +84,35 @@ def liste_equipements(request):
             | Q(categorie__nom__icontains=query)
         )
 
-    # Tri par ordre décroissant (les plus récents en premier)
-    equipements = equipements.order_by("-id")
+    # 3. Dictionnaire de sécurisation et d'association des tris
+    allowed_sorts = {
+        "reference": "reference",
+        "-reference": "-reference",
+        "nom": "nom",
+        "-nom": "-nom",
+        "categorie": "categorie__nom",
+        "-categorie": "-categorie",
+        "agence": "agence__nom",
+        "-agence": "-agence",
+        "statut": "statut",
+        "-statut": "-statut",
+    }
 
-    # 3. Pagination : 10 éléments par page
+    # Appliquer le tri s'il est valide, sinon tri par défaut
+    if sort_by in allowed_sorts:
+        equipements = equipements.order_by(allowed_sorts[sort_by])
+    else:
+        equipements = equipements.order_by("-id")
+
+    # 4. Pagination : 10 éléments par page
     paginator = Paginator(equipements, 10)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
     context = {
-        "equipements": page_obj,  # On transmet l'objet de pagination au template
+        "equipements": page_obj,
         "query": query,
+        "current_sort": sort_by,  # Transmis au template pour gérer l'affichage des flèches
     }
     return render(request, "core/pages/liste_equipements.html", context)
 
@@ -116,3 +134,47 @@ def liste_clients(request):
             clients = Client.objects.none()
 
     return render(request, "core/pages/liste_clients.html", {"clients": clients})
+
+
+@login_required
+@never_cache
+def equipement_supprimer(request, pk):
+    # Sécurité supplémentaire : seuls les administrateurs peuvent supprimer
+    if not request.user.is_superuser:
+        return redirect("core:liste_equipements")
+
+    equipement = get_object_or_404(Equipement, pk=pk)
+
+    if request.method == "POST":
+        equipement.delete()
+        return redirect("core:liste_equipements")
+
+    return render(
+        request,
+        "core/pages/equipement_confirmer_suppression.html",
+        {"equipement": equipement},
+    )
+
+
+@login_required
+@never_cache
+def equipement_modifier(request, pk):
+    # Réservé exclusivement aux administrateurs
+    if not request.user.is_superuser:
+        return redirect("core:liste_equipements")
+
+    equipement = get_object_or_404(Equipement, pk=pk)
+
+    if request.method == "POST":
+        form = EquipementForm(request.POST, instance=equipement)
+        if form.is_valid():
+            form.save()
+            return redirect("core:liste_equipements")
+    else:
+        form = EquipementForm(instance=equipement)
+
+    context = {
+        "form": form,
+        "equipement": equipement,
+    }
+    return render(request, "core/pages/equipement_form.html", context)

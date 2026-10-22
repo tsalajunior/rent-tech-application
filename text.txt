@@ -34,5 +34,11 @@ docker exec -it renttech_web_container python manage.py migrate
 
 
 * pagination eqmt 10 par page et barre de recherche ✅
-* qte pour un eqmt
-* mod & supp eqmt pour admin 
+* supp eqmt pour admin ✅
+* affichage & tri du tableau ✅
+* qte pour un eqmt ✅
+* gestion agence
+* gestion catégorie
+* gestion clients 
+* gestion locations (équipements loué n'apparaissent pas)
+* générer factures pdf

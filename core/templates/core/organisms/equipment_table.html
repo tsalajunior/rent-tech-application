@@ -2,21 +2,19 @@
     <!-- En-tête avec barre de recherche dynamique et bouton d'ajout -->
     <div class="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
         <h2 class="text-lg font-bold text-renttech-dark">Parc des équipements</h2>
-
+        
         <!-- Formulaire de recherche dynamique -->
         <form method="GET" action="" id="searchForm" class="flex items-center gap-2 w-full md:w-auto">
-            <input type="text" name="q" id="searchInput" value="{{ query }}" placeholder="Rechercher réf, nom, cat..."
-                class="px-4 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-renttech-primary focus:outline-none w-full md:w-72"
-                autocomplete="off">
+            <input type="text" name="q" id="searchInput" value="{{ query }}" placeholder="Rechercher réf, nom, cat..." 
+                   class="px-4 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-renttech-primary focus:outline-none w-full md:w-72"
+                   autocomplete="off">
             {% if query %}
-            <a href="{% url 'core:liste_equipements' %}"
-                class="text-gray-500 hover:text-gray-700 text-xs underline whitespace-nowrap">Réinitialiser</a>
+                <a href="{% url 'core:liste_equipements' %}" class="text-gray-500 hover:text-gray-700 text-xs underline whitespace-nowrap">Réinitialiser</a>
             {% endif %}
         </form>
 
         <!-- Bouton Nouvel équipement -->
-        <a href="#"
-            class="bg-renttech-primary hover:opacity-90 text-white px-4 py-2 rounded-md text-sm font-medium transition shadow-sm whitespace-nowrap">
+        <a href="#" class="bg-renttech-primary hover:opacity-90 text-white px-4 py-2 rounded-md text-sm font-medium transition shadow-sm whitespace-nowrap">
             + Nouvel équipement
         </a>
     </div>
@@ -26,38 +24,55 @@
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
                 <tr>
-                    <th scope="col"
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Référence
+                    <!-- Référence -->
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <a href="?sort={% if current_sort == 'reference' %}-reference{% else %}reference{% endif %}{% if query %}&q={{ query }}{% endif %}" class="hover:text-renttech-primary flex items-center gap-1">
+                            Référence 
+                            {% if current_sort == 'reference' %}&uarr;{% elif current_sort == '-reference' %}&darr;{% endif %}
+                        </a>
                     </th>
-                    <th scope="col"
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nom /
-                        Modèle</th>
-                    <th scope="col"
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Catégorie
+                    <!-- Nom / Modèle -->
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <a href="?sort={% if current_sort == 'nom' %}-nom{% else %}nom{% endif %}{% if query %}&q={{ query }}{% endif %}" class="hover:text-renttech-primary flex items-center gap-1">
+                            Nom / Modèle 
+                            {% if current_sort == 'nom' %}&uarr;{% elif current_sort == '-nom' %}&darr;{% endif %}
+                        </a>
                     </th>
-                    <th scope="col"
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Agence
+                    <!-- Catégorie -->
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <a href="?sort={% if current_sort == 'categorie' %}-categorie{% else %}categorie{% endif %}{% if query %}&q={{ query }}{% endif %}" class="hover:text-renttech-primary flex items-center gap-1">
+                            Catégorie 
+                            {% if current_sort == 'categorie' %}&uarr;{% elif current_sort == '-categorie' %}&darr;{% endif %}
+                        </a>
                     </th>
-                    <th scope="col"
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut
+                    <!-- Agence -->
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <a href="?sort={% if current_sort == 'agence' %}-agence{% else %}agence{% endif %}{% if query %}&q={{ query }}{% endif %}" class="hover:text-renttech-primary flex items-center gap-1">
+                            Agence 
+                            {% if current_sort == 'agence' %}&uarr;{% elif current_sort == '-agence' %}&darr;{% endif %}
+                        </a>
                     </th>
-                    <th scope="col"
-                        class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions
+                    <!-- Statut -->
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <a href="?sort={% if current_sort == 'statut' %}-statut{% else %}statut{% endif %}{% if query %}&q={{ query }}{% endif %}" class="hover:text-renttech-primary flex items-center gap-1">
+                            Statut 
+                            {% if current_sort == 'statut' %}&uarr;{% elif current_sort == '-statut' %}&darr;{% endif %}
+                        </a>
                     </th>
+                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
                 {% if equipements %}
-                {% for equipement in equipements %}
-                {% include 'core/molecules/equipment_row.html' with equipement=equipement %}
-                {% endfor %}
+                    {% for equipement in equipements %}
+                        {% include 'core/molecules/equipment_row.html' with equipement=equipement %}
+                    {% endfor %}
                 {% else %}
-                <tr>
-                    <td colspan="6" class="px-6 py-12 text-center text-sm text-gray-500">
-                        Aucun équipement trouvé {% if query %} pour la recherche "<span class="font-semibold">{{ query
-                            }}</span>"{% endif %}.
-                    </td>
-                </tr>
+                    <tr>
+                        <td colspan="6" class="px-6 py-12 text-center text-sm text-gray-500">
+                            Aucun équipement trouvé {% if query %} pour la recherche "<span class="font-semibold">{{ query }}</span>"{% endif %}.
+                        </td>
+                    </tr>
                 {% endif %}
             </tbody>
         </table>
@@ -72,11 +87,11 @@
     const searchInput = document.getElementById('searchInput');
     const searchForm = document.getElementById('searchForm');
     let typingTimer;
-    const doneTypingInterval = 400; // Délai de 400ms après la dernière frappe pour éviter de spammer le serveur
+    const doneTypingInterval = 400;
 
-    searchInput.addEventListener('input', function () {
+    searchInput.addEventListener('input', function() {
         clearTimeout(typingTimer);
-        typingTimer = setTimeout(function () {
+        typingTimer = setTimeout(function() {
             searchForm.submit();
         }, doneTypingInterval);
     });
