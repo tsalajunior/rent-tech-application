@@ -1,0 +1,127 @@
+{% extends 'core/templates/base.html' %}
+
+{% block title %}RentTech - Mon profil{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6 mt-6 mb-12">
+    <!-- Formulaire Informations personnelles -->
+    <div class="bg-white shadow rounded-lg p-8 border border-gray-100">
+        <div class="mb-6 border-b border-gray-100 pb-4">
+            <h1 class="text-xl font-bold text-renttech-dark">Mon Profil</h1>
+            <p class="text-gray-500 text-sm">Mettez à jour vos informations personnelles.</p>
+        </div>
+
+        <form method="POST" class="space-y-4">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="p-3 bg-red-50 border-l-4 border-red-500 text-red-700 text-sm rounded">
+                {{ form.non_field_errors }}
+            </div>
+            {% endif %}
+
+            <!-- Nom d'utilisateur -->
+            <div>
+                <label for="{{ form.username.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">Nom
+                    d'utilisateur</label>
+                {{ form.username }}
+                {% if form.username.errors %}
+                <p class="text-red-600 text-xs mt-1">{{ form.username.errors.0 }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Prénom -->
+            <div>
+                <label for="{{ form.first_name.id_for_label }}"
+                    class="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
+                {{ form.first_name }}
+                {% if form.first_name.errors %}
+                <p class="text-red-600 text-xs mt-1">{{ form.first_name.errors.0 }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Nom -->
+            <div>
+                <label for="{{ form.last_name.id_for_label }}"
+                    class="block text-sm font-medium text-gray-700 mb-1">Nom</label>
+                {{ form.last_name }}
+                {% if form.last_name.errors %}
+                <p class="text-red-600 text-xs mt-1">{{ form.last_name.errors.0 }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Email -->
+            <div>
+                <label for="{{ form.email.id_for_label }}"
+                    class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                {{ form.email }}
+                {% if form.email.errors %}
+                <p class="text-red-600 text-xs mt-1">{{ form.email.errors.0 }}</p>
+                {% endif %}
+            </div>
+
+            <div class="flex justify-end pt-4">
+                <button type="submit" name="update_profile"
+                    class="px-4 py-2 bg-renttech-primary hover:opacity-90 text-white rounded-md text-sm font-medium transition shadow-sm">
+                    Mettre à jour le profil
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Formulaire Modification du Mot de passe -->
+    <div class="bg-white shadow rounded-lg p-8 border border-gray-100">
+        <div class="mb-6 border-b border-gray-100 pb-4">
+            <h2 class="text-lg font-bold text-renttech-dark">Sécurité (Mot de passe)</h2>
+            <p class="text-gray-500 text-sm">Modifiez votre mot de passe de connexion.</p>
+        </div>
+
+        <form method="POST" class="space-y-4">
+            {% csrf_token %}
+
+            {% if password_form.non_field_errors %}
+            <div class="p-3 bg-red-50 border-l-4 border-red-500 text-red-700 text-sm rounded">
+                {{ password_form.non_field_errors }}
+            </div>
+            {% endif %}
+
+            <!-- Ancien mot de passe -->
+            <div>
+                <label for="{{ password_form.old_password.id_for_label }}"
+                    class="block text-sm font-medium text-gray-700 mb-1">Ancien mot de passe</label>
+                {{ password_form.old_password }}
+                {% if password_form.old_password.errors %}
+                <p class="text-red-600 text-xs mt-1">{{ password_form.old_password.errors.0 }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Nouveau mot de passe -->
+            <div>
+                <label for="{{ password_form.new_password1.id_for_label }}"
+                    class="block text-sm font-medium text-gray-700 mb-1">Nouveau mot de passe</label>
+                {{ password_form.new_password1 }}
+                {% if password_form.new_password1.errors %}
+                <p class="text-red-600 text-xs mt-1">{{ password_form.new_password1.errors.0 }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Confirmation du nouveau mot de passe -->
+            <div>
+                <label for="{{ password_form.new_password2.id_for_label }}"
+                    class="block text-sm font-medium text-gray-700 mb-1">Confirmation du nouveau mot de passe</label>
+                {{ password_form.new_password2 }}
+                {% if password_form.new_password2.errors %}
+                <p class="text-red-600 text-xs mt-1">{{ password_form.new_password2.errors.0 }}</p>
+                {% endif %}
+            </div>
+
+            <div class="flex justify-end pt-4">
+                <button type="submit" name="update_password"
+                    class="px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-md text-sm font-medium transition shadow-sm">
+                    Modifier le mot de passe
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

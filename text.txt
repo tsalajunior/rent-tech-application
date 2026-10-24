@@ -24,7 +24,7 @@ Le formulaire et la logique pour enregistrer une nouvelle location
 tsala - wxcvbnwx (paris)
 boska40 - qsdfghjklm (lyon)
 eren98 - mlkjhgfdsq (marseille)
-junior - nbvcxwnb (lile)
+junior777 - nbvcxwnb (lile)
 
 # Exécuter taiwind css
 docker exec -it renttech_web_container python manage.py collectstatic --noinput
@@ -42,7 +42,7 @@ docker exec -it renttech_web_container python manage.py migrate
 * qte pour un eqmt ✅
 * ajout nouvel équipement ✅
 * gestion agence & clients ✅
-* admin voir liste utilisateurs des agences (desactiver, supprimer)
+* admin voir liste utilisateurs des agences (desactiver, modifier) ✅
 * gestion catégorie (supprimer si aucun équipement, modifier, ajouter)
 * gestion locations (équipements loués et en maintenance n'apparaissent pas dans la liste lors de la sélection)
 * générer factures pdf

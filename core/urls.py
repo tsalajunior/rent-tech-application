@@ -1,12 +1,14 @@
 from django.urls import path
 from . import views
+from django.contrib.auth.views import LogoutView
 
 app_name = "core"
 
 urlpatterns = [
+    path('logout/', LogoutView.as_view(next_page='core:login'), name='logout'),
     path("", views.dashboard, name="dashboard"),
     path("equipements/", views.liste_equipements, name="liste_equipements"),
-    path('equipements/ajouter/', views.equipement_ajouter, name='equipement_ajouter'),
+    path("equipements/ajouter/", views.equipement_ajouter, name="equipement_ajouter"),
     path(
         "equipements/<int:pk>/supprimer/",
         views.equipement_supprimer,
@@ -23,4 +25,16 @@ urlpatterns = [
     path(
         "clients/<int:pk>/supprimer/", views.client_supprimer, name="client_supprimer"
     ),
+    path("utilisateurs/", views.liste_utilisateurs, name="liste_utilisateurs"),
+    path(
+        "utilisateurs/<int:pk>/modifier/",
+        views.utilisateur_modifier,
+        name="utilisateur_modifier",
+    ),
+    path(
+        "utilisateurs/<int:pk>/toggle-status/",
+        views.utilisateur_toggle_status,
+        name="utilisateur_toggle_status",
+    ),
+    path("mon-profil/", views.mon_profil, name="mon_profil"),
 ]

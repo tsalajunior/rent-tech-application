@@ -1,5 +1,6 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
 from .models import (
     Agence,
     Categorie,
@@ -13,7 +14,11 @@ from django.views.decorators.cache import never_cache
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect
-from .forms import ClientForm, EquipementForm
+from .forms import ClientForm, EquipementForm, AdminUserForm, UserProfileForm
+
+from django.contrib.auth.forms import PasswordChangeForm
+from django.contrib.auth import update_session_auth_hash
+
 
 # dashboard dynamique pour l'administrateur central et les employés
 @login_required
@@ -94,6 +99,7 @@ def dashboard(request):
         "agence_libelle": agence_libelle,
     }
     return render(request, "core/pages/dashboard.html", context)
+
 
 # Equiepements : liste, ajout, modification, suppression
 @login_required
@@ -218,6 +224,7 @@ def equipement_modifier(request, pk):
         "equipement": equipement,
     }
     return render(request, "core/pages/equipement_form.html", context)
+
 
 # Clients : liste, ajout, modification, suppression
 @login_required
@@ -360,3 +367,122 @@ def client_supprimer(request, pk):
     return render(
         request, "core/pages/client_confirmer_suppression.html", {"client": client}
     )
+
+
+# Utilisateurs : liste, ajout, modification, suppression
+@login_required
+@never_cache
+def liste_utilisateurs(request):
+    if not request.user.is_superuser:
+        return redirect("core:dashboard")
+
+    query = request.GET.get("q", "")
+    sort_by = request.GET.get("sort", "-id")
+
+    utilisateurs = User.objects.all()
+
+    # Recherche dynamique (Nom, Prénom, Email, Login)
+    if query:
+        utilisateurs = utilisateurs.filter(
+            Q(username__icontains=query)
+            | Q(first_name__icontains=query)
+            | Q(last_name__icontains=query)
+            | Q(email__icontains=query)
+        )
+
+    # Dictionnaire des tris autorisés
+    allowed_sorts = {
+        "nom": "last_name",
+        "-nom": "-last_name",
+        "prenom": "first_name",
+        "-prenom": "-first_name",
+        "email": "email",
+        "-email": "-email",
+        "agence": "profil__agence__nom",
+        "-agence": "-profil__agence__nom",
+        "username": "username",
+        "-username": "-username",
+    }
+
+    if sort_by in allowed_sorts:
+        utilisateurs = utilisateurs.order_by(allowed_sorts[sort_by])
+    else:
+        utilisateurs = utilisateurs.order_by("-id")
+
+    # Pagination (10 utilisateurs par page)
+    paginator = Paginator(utilisateurs, 10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        "utilisateurs": page_obj,
+        "query": query,
+        "current_sort": sort_by,
+    }
+    return render(request, "core/pages/liste_utilisateurs.html", context)
+
+
+@login_required
+@never_cache
+def utilisateur_modifier(request, pk):
+    if not request.user.is_superuser:
+        return redirect("core:dashboard")
+
+    user_obj = get_object_or_404(User, pk=pk)
+    if request.method == "POST":
+        form = AdminUserForm(request.POST, instance=user_obj)
+        if form.is_valid():
+            form.save()
+            return redirect("core:liste_utilisateurs")
+    else:
+        form = AdminUserForm(instance=user_obj)
+
+    context = {
+        "form": form,
+        "utilisateur": user_obj,
+    }
+    return render(request, "core/pages/utilisateur_form.html", context)
+
+
+@login_required
+@never_cache
+def utilisateur_toggle_status(request, pk):
+    if not request.user.is_superuser:
+        return redirect("core:dashboard")
+
+    user_obj = get_object_or_404(User, pk=pk)
+    # Empêcher l'admin de se désactiver lui-même par erreur
+    if user_obj != request.user:
+        user_obj.is_active = not user_obj.is_active
+        user_obj.save()
+
+    return redirect("core:liste_utilisateurs")
+
+
+@login_required
+@never_cache
+def mon_profil(request):
+    user = request.user
+    if request.method == "POST":
+        form = UserProfileForm(request.POST, instance=user)
+        password_form = PasswordChangeForm(user, request.POST)
+
+        # Gestion de la soumission simultanée ou séparée (ici on gère les deux formulaires)
+        if "update_profile" in request.POST and form.is_valid():
+            form.save()
+            return redirect("core:mon_profil")
+
+        elif "update_password" in request.POST:
+            if password_form.is_valid():
+                user_updated = password_form.save()
+                update_session_auth_hash(request, user_updated)  # Évite la déconnexion
+                return redirect("core:mon_profil")
+    else:
+        form = UserProfileForm(instance=user)
+        password_form = PasswordChangeForm(user)
+
+    context = {
+        "form": form,
+        "password_form": password_form,
+    }
+    return render(request, "core/pages/mon_profil.html", context)
