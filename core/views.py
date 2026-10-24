@@ -1,13 +1,21 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
-from .models import Equipement, Client, Location
+from .models import (
+    Agence,
+    Categorie,
+    Equipement,
+    Client,
+    Location,
+    LocationEquipement,
+    ProfilEmploye,
+)
 from django.views.decorators.cache import never_cache
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect
-from .forms import EquipementForm
+from .forms import ClientForm, EquipementForm
 
-
+# dashboard dynamique pour l'administrateur central et les employés
 @login_required
 @never_cache
 def dashboard(request):
@@ -18,37 +26,66 @@ def dashboard(request):
     """
     user = request.user
 
+    # if user.is_superuser:
+    #     # Vue globale SuperAdmin
+    #     total_clients = Client.objects.count()
+    #     total_equipements = Equipement.objects.count()
+    #     locations_en_cours = Location.objects.filter(retour_reelle__isnull=True).count()
+    #     agence_libelle = "Administration Centrale (Toutes les Agences)"
+    # else:
+    #     # Vue restreinte à l'agence de l'employé
+    #     try:
+    #         employe_agence = user.profil.agence
+    #     except AttributeError:
+    #         employe_agence = None
+
+    #     if employe_agence:
+    #         # Filtrage strict par agence
+    #         total_equipements = Equipement.objects.filter(agence=employe_agence).count()
+    #         locations_en_cours = Location.objects.filter(
+    #             agence=employe_agence, retour_reelle__isnull=True
+    #         ).count()
+    #         # Clients ayant effectué une location dans cette agence
+    #         total_clients = (
+    #             Client.objects.filter(locations__agence=employe_agence)
+    #             .distinct()
+    #             .count()
+    #         )
+    #         agence_libelle = f"Agence de {employe_agence.ville} ({employe_agence.nom})"
+    #     else:
+    #         total_equipements = 0
+    #         locations_en_cours = 0
+    #         total_clients = 0
+    #         agence_libelle = "Aucune agence assignée"
+
+    # context = {
+    #     "total_clients": total_clients,
+    #     "total_equipements": total_equipements,
+    #     "locations_en_cours": locations_en_cours,
+    #     "agence_libelle": agence_libelle,
+    # }
+    # return render(request, "core/pages/dashboard.html", context)
     if user.is_superuser:
-        # Vue globale SuperAdmin
-        total_clients = Client.objects.count()
+        # Vue globale à 360° pour l'administrateur central
         total_equipements = Equipement.objects.count()
+        total_clients = Client.objects.count()
         locations_en_cours = Location.objects.filter(retour_reelle__isnull=True).count()
-        agence_libelle = "Administration Centrale (Toutes les Agences)"
+        agence_libelle = "Administration Centrale (Vue globale)"
     else:
-        # Vue restreinte à l'agence de l'employé
         try:
             employe_agence = user.profil.agence
-        except AttributeError:
-            employe_agence = None
-
-        if employe_agence:
-            # Filtrage strict par agence
+            # Filtrage strict par agence pour l'employé
             total_equipements = Equipement.objects.filter(agence=employe_agence).count()
+            total_clients = Client.objects.filter(agence=employe_agence).count()
             locations_en_cours = Location.objects.filter(
                 agence=employe_agence, retour_reelle__isnull=True
             ).count()
-            # Clients ayant effectué une location dans cette agence
-            total_clients = (
-                Client.objects.filter(locations__agence=employe_agence)
-                .distinct()
-                .count()
-            )
             agence_libelle = f"Agence de {employe_agence.ville} ({employe_agence.nom})"
-        else:
+        except AttributeError:
             total_equipements = 0
-            locations_en_cours = 0
             total_clients = 0
-            agence_libelle = "Aucune agence assignée"
+            locations_en_cours = 0
+            agence_libelle = "Aucune agence rattachée"
 
     context = {
         "total_clients": total_clients,
@@ -58,7 +95,7 @@ def dashboard(request):
     }
     return render(request, "core/pages/dashboard.html", context)
 
-
+# Equiepements : liste, ajout, modification, suppression
 @login_required
 @never_cache
 def liste_equipements(request):
@@ -119,21 +156,24 @@ def liste_equipements(request):
 
 @login_required
 @never_cache
-def liste_clients(request):
-    """
-    Liste des clients filtrée par agence pour les employés.
-    """
-    user = request.user
-    if user.is_superuser:
-        clients = Client.objects.all()
-    else:
-        try:
-            employe_agence = user.profil.agence
-            clients = Client.objects.filter(locations__agence=employe_agence).distinct()
-        except AttributeError:
-            clients = Client.objects.none()
+def equipement_ajouter(request):
+    # Réservé exclusivement à l'administrateur central
+    if not request.user.is_superuser:
+        return redirect("core:liste_equipements")
 
-    return render(request, "core/pages/liste_clients.html", {"clients": clients})
+    if request.method == "POST":
+        form = EquipementForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect("core:liste_equipements")
+    else:
+        form = EquipementForm()
+
+    context = {
+        "form": form,
+        "action": "Ajouter",
+    }
+    return render(request, "core/pages/equipement_form.html", context)
 
 
 @login_required
@@ -178,3 +218,145 @@ def equipement_modifier(request, pk):
         "equipement": equipement,
     }
     return render(request, "core/pages/equipement_form.html", context)
+
+# Clients : liste, ajout, modification, suppression
+@login_required
+@never_cache
+def liste_clients(request):
+    """
+    Liste des clients filtrée par agence pour les employés.
+    """
+    user = request.user
+    query = request.GET.get("q", "")
+    sort_by = request.GET.get("sort", "-id")
+
+    # Cloisonnement agence / superuser
+    if user.is_superuser:
+        clients = Client.objects.all()
+    else:
+        try:
+            employe_agence = user.profil.agence
+            clients = Client.objects.filter(agence=employe_agence)
+        except AttributeError:
+            clients = Client.objects.none()
+
+    # Recherche dynamique (Nom, Prénom, Email ou Téléphone)
+    if query:
+        clients = clients.filter(
+            Q(nom__icontains=query)
+            | Q(prenom__icontains=query)
+            | Q(email__icontains=query)
+            | Q(telephone__icontains=query)
+        )
+
+    # Tris autorisés
+    allowed_sorts = {
+        "nom": "nom",
+        "-nom": "-nom",
+        "email": "email",
+        "-email": "-email",
+        "agence": "agence__nom",
+        "-agence": "-agence",
+    }
+
+    if sort_by in allowed_sorts:
+        clients = clients.order_by(allowed_sorts[sort_by])
+    else:
+        clients = clients.order_by("-id")
+
+    # Pagination (10 éléments par page)
+    paginator = Paginator(clients, 10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        "clients": page_obj,
+        "query": query,
+        "current_sort": sort_by,
+    }
+    return render(request, "core/pages/liste_clients.html", context)
+
+
+@login_required
+@never_cache
+def client_ajouter(request):
+    user = request.user
+    if request.method == "POST":
+        form = ClientForm(request.POST)
+        if form.is_valid():
+            client = form.save(commit=False)
+            # Si non-superuser, on force l'agence de l'employé connecté
+            if not user.is_superuser:
+                try:
+                    client.agence = user.profil.agence
+                except AttributeError:
+                    pass
+            client.save()
+            return redirect("core:liste_clients")
+    else:
+        form = ClientForm()
+        # Restreindre le choix de l'agence pour un employé simple
+        if not user.is_superuser:
+            try:
+                form.fields["agence"].queryset = Agence.objects.filter(
+                    id=user.profil.agence.id
+                )
+                form.initial["agence"] = user.profil.agence
+            except AttributeError:
+                pass
+
+    return render(
+        request, "core/pages/client_form.html", {"form": form, "action": "Ajouter"}
+    )
+
+
+@login_required
+@never_cache
+def client_modifier(request, pk):
+    client = get_object_or_404(Client, pk=pk)
+    user = request.user
+
+    # Contrôle d'accès agence
+    if not user.is_superuser:
+        try:
+            if client.agence != user.profil.agence:
+                return redirect("core:liste_clients")
+        except AttributeError:
+            return redirect("core:liste_clients")
+
+    if request.method == "POST":
+        form = ClientForm(request.POST, instance=client)
+        if form.is_valid():
+            form.save()
+            return redirect("core:liste_clients")
+    else:
+        form = ClientForm(instance=client)
+        if not user.is_superuser:
+            try:
+                form.fields["agence"].queryset = Agence.objects.filter(
+                    id=user.profil.agence.id
+                )
+            except AttributeError:
+                pass
+
+    return render(
+        request,
+        "core/pages/client_form.html",
+        {"form": form, "client": client, "action": "Modifier"},
+    )
+
+
+@login_required
+@never_cache
+def client_supprimer(request, pk):
+    if not request.user.is_superuser:
+        return redirect("core:liste_clients")
+
+    client = get_object_or_404(Client, pk=pk)
+    if request.method == "POST":
+        client.delete()
+        return redirect("core:liste_clients")
+
+    return render(
+        request, "core/pages/client_confirmer_suppression.html", {"client": client}
+    )

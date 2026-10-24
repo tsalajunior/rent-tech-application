@@ -1,0 +1,21 @@
+<tr class="hover:bg-gray-50 transition border-b border-gray-100">
+    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-renttech-dark">
+        {{ client.nom }} {{ client.prenom|default:"" }}
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+        {{ client.email }}
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+        {{ client.telephone }}
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+        {{ client.agence.nom }}
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
+        <a href="{% url 'core:client_modifier' client.id %}" class="text-renttech-primary hover:underline">Modifier</a>
+        {% if request.user.is_superuser %}
+        <a href="{% url 'core:client_supprimer' client.id %}"
+            class="text-red-600 hover:text-red-800 transition">Supprimer</a>
+        {% endif %}
+    </td>
+</tr>

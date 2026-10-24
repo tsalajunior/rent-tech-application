@@ -66,9 +66,14 @@ class Client(models.Model):
     prenom = models.CharField(max_length=100, blank=True, null=True)
     email = models.EmailField(unique=True)
     telephone = models.CharField(max_length=20)
+    agence = models.ForeignKey(Agence, on_delete=models.CASCADE, related_name="clients")
+
+    class Meta:
+        # Optionnel : Empêche d'avoir deux fois le même email dans la même agence
+        unique_together = ("email", "agence")
 
     def __str__(self):
-        return f"{self.prenom} {self.nom}"
+        return f"{self.prenom} {self.nom} ({self.agence.nom})"
 
 
 class Location(models.Model):

@@ -18,7 +18,7 @@
 
     <!-- Grille de Statistiques (Utilisation de la Molécule stat_card) -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {% include 'core/molecules/stat_card.html' with title="Clients de l'agence" value=total_clients border_color="border-renttech-primary" %}
+        {% include 'core/molecules/stat_card.html' with title="Total clients" value=total_clients border_color="border-renttech-primary" %}
         {% include 'core/molecules/stat_card.html' with title="Équipements en stock" value=total_equipements border_color="border-renttech-lightblue" %}
         {% include 'core/molecules/stat_card.html' with title="Locations en cours" value=locations_en_cours border_color="border-amber-500" %}
     </div>
