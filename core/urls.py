@@ -49,4 +49,10 @@ urlpatterns = [
         views.categorie_supprimer,
         name="categorie_supprimer",
     ),
+    path("agences/", views.liste_agences, name="liste_agences"),
+    path("agences/ajouter/", views.agence_ajouter, name="agence_ajouter"),
+    path("agences/<int:pk>/modifier/", views.agence_modifier, name="agence_modifier"),
+    path(
+        "agences/<int:pk>/supprimer/", views.agence_supprimer, name="agence_supprimer"
+    ),
 ]

@@ -14,6 +14,15 @@ class Agence(models.Model):
     def __str__(self):
         return f"{self.nom} ({self.ville})"
 
+    def a_des_dependances(self):
+        """Vérifie dynamiquement et exhaustivement si l'agence est liée à la moindre donnée (clients, équipements, locations, utilisateurs, etc.)"""
+        for rel in self._meta.related_objects:
+            accessor_name = rel.get_accessor_name()
+            manager = getattr(self, accessor_name, None)
+            if manager and manager.exists():
+                return True
+        return False
+
 
 class Categorie(models.Model):
     """

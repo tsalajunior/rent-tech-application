@@ -189,3 +189,25 @@ class CategorieForm(forms.ModelForm):
         }
 
 
+class AgenceForm(forms.ModelForm):
+    class Meta:
+        model = Agence
+        fields = ["nom", "ville", "adresse"]
+        widgets = {
+            "nom": forms.TextInput(
+                attrs={
+                    "class": "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-renttech-primary"
+                }
+            ),
+            "ville": forms.TextInput(
+                attrs={
+                    "class": "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-renttech-primary"
+                }
+            ),
+            "adresse": forms.Textarea(
+                attrs={
+                    "rows": 3,
+                    "class": "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-renttech-primary",
+                }
+            ),
+        }

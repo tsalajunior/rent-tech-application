@@ -21,6 +21,10 @@
                 {% if request.user.is_superuser %}
                 <a href="{% url 'core:liste_utilisateurs' %}"
                     class="text-gray-300 hover:text-white text-sm font-medium transition">Utilisateurs</a>
+                <a href="{% url 'core:liste_agences' %}"
+                    class="text-gray-300 hover:text-white text-sm font-medium transition">
+                    Agences
+                </a>
                 <a href="{% url 'core:liste_categories' %}"
                     class="text-gray-300 hover:text-white text-sm font-medium transition">Catégories</a>
                 {% endif %}

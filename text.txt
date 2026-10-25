@@ -40,8 +40,10 @@ docker exec -it renttech_web_container python manage.py migrate
 * affichage & tri du tableau ✅
 * qte pour un eqmt ✅
 * ajout nouvel équipement ✅
-* gestion agence & clients ✅
+* gestion clients ✅
 * admin voir liste utilisateurs des agences (desactiver, modifier) ✅
 * gestion catégorie (supprimer si aucun équipement, modifier, ajouter) ✅
-* gestion locations (équipements loués et en maintenance n'apparaissent pas dans la liste lors de la sélection)
-* générer factures pdf
+* gestion des agences (supprimer si aucun eqmt/client/location/user, modifier, ajouter) ✅
+* gestion locations (équipements loués et en maintenance n'apparaissent 
+        pas dans la liste lors de la sélection) 
+* générer factures pdf 

@@ -24,8 +24,8 @@ from .forms import (
     AdminUserForm,
     UserProfileForm,
     CategorieForm,
+    AgenceForm,
 )
-
 
 
 # dashboard dynamique pour l'administrateur central et les employés
@@ -553,18 +553,75 @@ def categorie_modifier(request, pk):
 @never_cache
 def categorie_supprimer(request, pk):
     categorie = get_object_or_404(Categorie, pk=pk)
-    
+
     # Vérifie si des équipements sont liés à cette catégorie
     # (Note : si vous avez défini un 'related_name' dans votre modèle Equipement, remplacez 'equipement_set' par ce nom)
     if categorie.equipements.exists():
         messages.error(
-            request, 
-            f"Impossible de supprimer la catégorie « {categorie.nom} » car elle est associée à un ou plusieurs équipements."
+            request,
+            f"Impossible de supprimer la catégorie « {categorie.nom} » car elle est associée à un ou plusieurs équipements.",
         )
     else:
         categorie.delete()
         messages.success(request, "La catégorie a été supprimée avec succès.")
-        
-    return redirect('core:liste_categories')
+
+    return redirect("core:liste_categories")
 
 
+# Agences : liste, ajout, modification, suppression
+@login_required
+@never_cache
+def liste_agences(request):
+    agences = Agence.objects.all()
+    return render(request, "core/pages/liste_agences.html", {"agences": agences})
+
+
+@login_required
+@never_cache
+def agence_ajouter(request):
+    if request.method == "POST":
+        form = AgenceForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "L'agence a été créée avec succès.")
+            return redirect("core:liste_agences")
+    else:
+        form = AgenceForm()
+    return render(
+        request, "core/pages/agence_form.html", {"form": form, "action": "Ajouter"}
+    )
+
+
+@login_required
+@never_cache
+def agence_modifier(request, pk):
+    agence = get_object_or_404(Agence, pk=pk)
+    if request.method == "POST":
+        form = AgenceForm(request.POST, instance=agence)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "L'agence a été modifiée avec succès.")
+            return redirect("core:liste_agences")
+    else:
+        form = AgenceForm(instance=agence)
+    return render(
+        request, "core/pages/agence_form.html", {"form": form, "action": "Modifier"}
+    )
+
+
+@login_required
+@never_cache
+def agence_supprimer(request, pk):
+    agence = get_object_or_404(Agence, pk=pk)
+
+    # Sécurité stricte basée sur la méthode du modèle
+    if agence.a_des_dependances():
+        messages.error(
+            request,
+            f"Action impossible : L'agence « {agence.nom} » possède des données liées (clients, équipements, utilisateurs ou locations) et ne peut pas être supprimée.",
+        )
+    else:
+        agence.delete()
+        messages.success(request, "L'agence a été supprimée avec succès.")
+
+    return redirect("core:liste_agences")
