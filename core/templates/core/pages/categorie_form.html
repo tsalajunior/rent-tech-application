@@ -1,0 +1,40 @@
+{% extends 'core/templates/base.html' %}
+
+{% block title %}RentTech - {{ action }} une catégorie{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto bg-white shadow rounded-lg p-8 border border-gray-100 mt-6 mb-12">
+    <div class="mb-6 border-b border-gray-100 pb-4">
+        <h1 class="text-xl font-bold text-renttech-dark">{{ action }} une catégorie</h1>
+        <p class="text-gray-500 text-sm">Renseignez les informations de la famille d'équipements.</p>
+    </div>
+
+    <form method="POST" class="space-y-4">
+        {% csrf_token %}
+
+        <div>
+            <label for="{{ form.nom.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">Nom</label>
+            {{ form.nom }}
+            {% if form.nom.errors %}<p class="text-red-600 text-xs mt-1">{{ form.nom.errors.0 }}</p>{% endif %}
+        </div>
+
+        <div>
+            <label for="{{ form.description.id_for_label }}"
+                class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            {{ form.description }}
+            {% if form.description.errors %}<p class="text-red-600 text-xs mt-1">{{ form.description.errors.0 }}</p>{% endif %}
+        </div>
+
+        <div class="flex justify-end space-x-4 pt-4 border-t border-gray-100">
+            <a href="{% url 'core:liste_categories' %}"
+                class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm font-medium transition">
+                Annuler
+            </a>
+            <button type="submit"
+                class="px-4 py-2 bg-renttech-primary hover:opacity-90 text-white rounded-md text-sm font-medium transition shadow-sm">
+                Enregistrer
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -32,6 +32,18 @@
     <!-- Organisme : Barre de navigation -->
     {% include 'core/organisms/navbar.html' %}
 
+    <!-- Affichage des messages Django (Erreurs / Succès) -->
+    {% if messages %}
+        <div class="max-w-7xl mx-auto px-4 mt-4">
+            {% for message in messages %}
+            <div
+                class="p-4 mb-4 rounded-md text-sm {% if message.tags == 'error' %}bg-red-50 text-red-700 border border-red-200{% elif message.tags == 'warning' %}bg-yellow-50 text-yellow-700 border border-yellow-200{% else %}bg-green-50 text-green-700 border border-green-200{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
     <!-- Contenu dynamique de la Page -->
     <main class="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
         {% block content %}{% endblock %}

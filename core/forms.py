@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib.auth.models import User
-from .models import Agence, Equipement, Client, ProfilEmploye
+from .models import Agence, Equipement, Client, ProfilEmploye, Categorie
 
 
 class EquipementForm(forms.ModelForm):
@@ -165,6 +165,25 @@ class UserProfileForm(forms.ModelForm):
             "email": forms.EmailInput(
                 attrs={
                     "class": "w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-renttech-primary focus:outline-none text-sm"
+                }
+            ),
+        }
+
+
+class CategorieForm(forms.ModelForm):
+    class Meta:
+        model = Categorie
+        fields = ["nom", "description"]
+        widgets = {
+            "nom": forms.TextInput(
+                attrs={
+                    "class": "w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-renttech-primary focus:outline-none text-sm"
+                }
+            ),
+            "description": forms.Textarea(
+                attrs={
+                    "rows": 3,
+                    "class": "w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-renttech-primary focus:outline-none text-sm",
                 }
             ),
         }

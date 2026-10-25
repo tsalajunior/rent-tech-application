@@ -12,8 +12,8 @@ class AgenceAdmin(admin.ModelAdmin):
 
 @admin.register(Categorie)
 class CategorieAdmin(admin.ModelAdmin):
-    list_display = ("nom",)
-    search_fields = ("nom",)
+    list_display = ("nom","description")
+    search_fields = ("nom","description")
 
 
 @admin.register(Equipement)

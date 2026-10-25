@@ -1,6 +1,10 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
+
+from django.contrib.auth.forms import PasswordChangeForm
+from django.contrib.auth import update_session_auth_hash
+from django.contrib import messages
 from .models import (
     Agence,
     Categorie,
@@ -14,10 +18,14 @@ from django.views.decorators.cache import never_cache
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect
-from .forms import ClientForm, EquipementForm, AdminUserForm, UserProfileForm
+from .forms import (
+    ClientForm,
+    EquipementForm,
+    AdminUserForm,
+    UserProfileForm,
+    CategorieForm,
+)
 
-from django.contrib.auth.forms import PasswordChangeForm
-from django.contrib.auth import update_session_auth_hash
 
 
 # dashboard dynamique pour l'administrateur central et les employés
@@ -486,3 +494,77 @@ def mon_profil(request):
         "password_form": password_form,
     }
     return render(request, "core/pages/mon_profil.html", context)
+
+
+# Categories : liste, ajout, modification, suppression
+@login_required
+@never_cache
+def liste_categories(request):
+    if not request.user.is_superuser:
+        return redirect("core:dashboard")
+
+    categories = Categorie.objects.all().order_by("nom")
+    context = {"categories": categories}
+    return render(request, "core/pages/liste_categories.html", context)
+
+
+@login_required
+@never_cache
+def categorie_ajouter(request):
+    if not request.user.is_superuser:
+        return redirect("core:dashboard")
+
+    if request.method == "POST":
+        form = CategorieForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect("core:liste_categories")
+    else:
+        form = CategorieForm()
+
+    return render(
+        request, "core/pages/categorie_form.html", {"form": form, "action": "Ajouter"}
+    )
+
+
+@login_required
+@never_cache
+def categorie_modifier(request, pk):
+    if not request.user.is_superuser:
+        return redirect("core:dashboard")
+
+    categorie = get_object_or_404(Categorie, pk=pk)
+    if request.method == "POST":
+        form = CategorieForm(request.POST, instance=categorie)
+        if form.is_valid():
+            form.save()
+            return redirect("core:liste_categories")
+    else:
+        form = CategorieForm(instance=categorie)
+
+    return render(
+        request,
+        "core/pages/categorie_form.html",
+        {"form": form, "categorie": categorie, "action": "Modifier"},
+    )
+
+
+@login_required
+@never_cache
+def categorie_supprimer(request, pk):
+    categorie = get_object_or_404(Categorie, pk=pk)
+    
+    # Vérifie si des équipements sont liés à cette catégorie
+    # (Note : si vous avez défini un 'related_name' dans votre modèle Equipement, remplacez 'equipement_set' par ce nom)
+    if categorie.equipements.exists():
+        messages.error(
+            request, 
+            f"Impossible de supprimer la catégorie « {categorie.nom} » car elle est associée à un ou plusieurs équipements."
+        )
+    else:
+        categorie.delete()
+        messages.success(request, "La catégorie a été supprimée avec succès.")
+        
+    return redirect('core:liste_categories')
+
+
