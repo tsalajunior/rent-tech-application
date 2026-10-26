@@ -27,8 +27,17 @@
     <div class="bg-white shadow rounded-lg p-6">
         <h2 class="text-lg font-semibold text-renttech-dark mb-4">Actions Rapides</h2>
         <div class="flex flex-wrap gap-4">
-            {% include 'core/atoms/button.html' with href="/equipements/" label="Voir les équipements" color="renttech-primary" %}
-            {% include 'core/atoms/button.html' with href="/clients/" label="Gérer les clients" color="renttech-dark" %}
+            <!-- Bouton pour créer une location -->
+            {% url 'core:creer_location' as url_creer_loc %}
+            {% include 'core/atoms/button.html' with href=url_creer_loc label="+ Nouvelle location" color="renttech-primary" %}
+
+            <!-- Bouton pour les équipements -->
+            {% url 'core:liste_equipements' as url_equipements %}
+            {% include 'core/atoms/button.html' with href=url_equipements label="Voir les équipements" color="renttech-primary" %}
+
+            <!-- Bouton pour les clients -->
+            {% url 'core:liste_clients' as url_clients %}
+            {% include 'core/atoms/button.html' with href=url_clients label="Gérer les clients" color="renttech-dark" %}
         </div>
     </div>
 </div>

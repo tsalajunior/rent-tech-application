@@ -5,6 +5,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth import update_session_auth_hash
 from django.contrib import messages
+from django.db import transaction
 from .models import (
     Agence,
     Categorie,
@@ -25,6 +26,7 @@ from .forms import (
     UserProfileForm,
     CategorieForm,
     AgenceForm,
+    LocationForm,
 )
 
 
@@ -625,3 +627,94 @@ def agence_supprimer(request, pk):
         messages.success(request, "L'agence a été supprimée avec succès.")
 
     return redirect("core:liste_agences")
+
+
+# Locations : liste, ajout, modification, suppression
+@login_required
+@never_cache
+def creer_location(request):
+    client_agence_map = dict(Client.objects.values_list("id", "agence_id"))
+
+    if request.method == "POST":
+        form = LocationForm(request.POST)
+        equipements_ids = request.POST.getlist("equipements")
+
+        if form.is_valid() and equipements_ids:
+            try:
+                with transaction.atomic():
+                    location = form.save(commit=False)
+                    location.employe = request.user
+
+                    duree = (location.retour_prevue - location.date_debut).days
+                    if duree <= 0:
+                        messages.error(
+                            request,
+                            "La date de retour prévue doit être postérieure à la date de début.",
+                        )
+                        return render(
+                            request,
+                            "core/pages/location_form.html",
+                            {
+                                "form": form,
+                                "equipements": Equipement.objects.all(),
+                                "client_agence_map": client_agence_map,
+                            },
+                        )
+
+                    montant_total = 0.00
+                    location.save()
+
+                    for eq_id in equipements_ids:
+                        equipement = Equipement.objects.get(pk=eq_id)
+                        prix_jour = getattr(equipement, "prix_journalier", 0.00)
+                        montant_total += float(prix_jour) * duree
+
+                        LocationEquipement.objects.create(
+                            location=location,
+                            equipement=equipement,
+                            prix_journalier_applique=prix_jour,
+                        )
+
+                    location.montant_total = montant_total
+                    location.save()
+
+                    messages.success(
+                        request, f"La location #{location.id} a été créée avec succès."
+                    )
+                    return redirect("core:liste_locations")
+
+            except Exception as e:
+                messages.error(
+                    request, f"Erreur lors de la création de la location : {e}"
+                )
+        else:
+            if not equipements_ids:
+                messages.error(
+                    request,
+                    "Veuillez sélectionner au moins un équipement pour cette location.",
+                )
+    else:
+        form = LocationForm()
+
+    equipements = Equipement.objects.all()
+    return render(
+        request,
+        "core/pages/location_form.html",
+        {
+            "form": form,
+            "equipements": equipements,
+            "client_agence_map": client_agence_map,
+        },
+    )
+
+
+@login_required
+@never_cache
+def liste_locations(request):
+    # Les admins voient tout, les employés peuvent aussi tout voir (ou seulement leurs locations, selon ton choix métier)
+    locations = (
+        Location.objects.all()
+        .select_related("client", "agence", "employe")
+        .prefetch_related("lignes_location__equipement")
+    )
+    return render(request, "core/pages/liste_locations.html", {"locations": locations})

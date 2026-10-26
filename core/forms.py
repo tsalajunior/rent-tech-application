@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib.auth.models import User
-from .models import Agence, Equipement, Client, ProfilEmploye, Categorie
+from .models import Agence, Equipement, Client, ProfilEmploye, Categorie, Location
 
 
 class EquipementForm(forms.ModelForm):
@@ -208,6 +208,41 @@ class AgenceForm(forms.ModelForm):
                 attrs={
                     "rows": 3,
                     "class": "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-renttech-primary",
+                }
+            ),
+        }
+
+
+class LocationForm(forms.ModelForm):
+    class Meta:
+        model = Location
+        fields = ["client", "agence", "date_debut", "retour_prevue", "caution"]
+        widgets = {
+            "client": forms.Select(
+                attrs={
+                    "class": "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-renttech-primary"
+                }
+            ),
+            "agence": forms.Select(
+                attrs={
+                    "class": "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-renttech-primary"
+                }
+            ),
+            "date_debut": forms.DateInput(
+                attrs={
+                    "type": "date",
+                    "class": "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-renttech-primary",
+                }
+            ),
+            "retour_prevue": forms.DateInput(
+                attrs={
+                    "type": "date",
+                    "class": "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-renttech-primary",
+                }
+            ),
+            "caution": forms.NumberInput(
+                attrs={
+                    "class": "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-renttech-primary"
                 }
             ),
         }

@@ -18,6 +18,7 @@
                 <a href="{% url 'core:liste_clients' %}"
                     class="text-gray-300 hover:text-white text-sm font-medium transition">Clients</a>
 
+                <a href="{% url 'core:liste_locations' %}" class="text-gray-300 hover:text-white text-sm font-medium transition">Locations</a>
                 {% if request.user.is_superuser %}
                 <a href="{% url 'core:liste_utilisateurs' %}"
                     class="text-gray-300 hover:text-white text-sm font-medium transition">Utilisateurs</a>

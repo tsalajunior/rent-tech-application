@@ -55,4 +55,7 @@ urlpatterns = [
     path(
         "agences/<int:pk>/supprimer/", views.agence_supprimer, name="agence_supprimer"
     ),
+    path("locations/", views.liste_locations, name="liste_locations"),
+    path("liste_locations/", views.liste_locations),
+    path("locations/ajouter/", views.creer_location, name="creer_location"),
 ]

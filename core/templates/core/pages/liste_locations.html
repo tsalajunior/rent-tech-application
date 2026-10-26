@@ -1,0 +1,121 @@
+{% extends 'core/templates/base.html' %}
+
+{% block title %}RentTech - Gestion des locations{% endblock %}
+
+{% block content %}
+<div class="bg-white shadow rounded-lg overflow-hidden border border-gray-100 max-w-7xl mx-auto mt-6 mb-12">
+    <!-- En-tête du tableau avec le bouton d'ajout global -->
+    <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+        <div>
+            <h2 class="text-lg font-bold text-renttech-dark">Locations de comptoir</h2>
+            <p class="text-xs text-gray-500">Suivi des contrats, des équipements loués et des statuts.</p>
+        </div>
+        <!-- Accessible à l'admin et au simple user -->
+        <a href="{% url 'core:creer_location' %}"
+            class="bg-renttech-primary hover:opacity-90 text-white px-4 py-2 rounded-md text-sm font-medium transition shadow-sm whitespace-nowrap">
+            + Nouvelle location
+        </a>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#ID</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Agence</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Période</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Montant Total</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% if locations %}
+                {% for loc in locations %}
+                <tr class="hover:bg-gray-50 transition">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-renttech-dark">
+                        #{{ loc.id }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800 font-medium">
+                        {{ loc.client.nom }} {{ loc.client.prenom|default:"" }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {{ loc.agence.nom }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        Du {{ loc.date_debut|date:"d/m/Y" }} au {{ loc.retour_prevue|date:"d/m/Y" }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-renttech-primary">
+                        {{ loc.montant_total }} €
+                    </td>
+                    
+                    <!-- Colonne des actions sécurisée selon le rôle -->
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
+                        <!-- Le détail est accessible à tout le monde -->
+                        <a href="#" class="text-gray-600 hover:text-renttech-primary">Détails</a>
+
+                        {% if request.user.is_superuser %}
+                            <!-- Actions réservées STRICTEMENT à l'administrateur -->
+                            <a href="#" class="text-renttech-primary hover:underline">Modifier</a>
+                            
+                            <button type="button" onclick="document.getElementById('delete_modal_{{ loc.id }}').showModal()"
+                                class="text-red-600 hover:text-red-800 transition cursor-pointer">
+                                Supprimer
+                            </button>
+                        {% else %}
+                            <!-- Pour un simple user : aucun droit de modification/suppression -->
+                            <span class="text-gray-300 cursor-not-allowed select-none text-xs" title="Réservé à l'administrateur">
+                                Verrouillé
+                            </span>
+                        {% endif %}
+                    </td>
+                </tr>
+
+                <!-- Modale de suppression (Uniquement si admin) -->
+                {% if request.user.is_superuser %}
+                <dialog id="delete_modal_{{ loc.id }}"
+                    class="m-auto p-0 rounded-lg shadow-2xl backdrop:bg-gray-900/50 max-w-md w-full bg-white">
+                    <div class="p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-bold text-gray-900">Confirmer la suppression</h3>
+                            <button type="button"
+                                onclick="document.getElementById('delete_modal_{{ loc.id }}').close()"
+                                class="text-gray-400 hover:text-gray-600">
+                                ✕
+                            </button>
+                        </div>
+
+                        <p class="text-sm text-gray-600 mb-6">
+                            Êtes-vous sûr de vouloir supprimer la location <span class="font-semibold text-gray-800">#{{ loc.id }}</span> ? Cette action remettra les équipements en circulation.
+                        </p>
+
+                        <div class="flex justify-end space-x-3">
+                            <button type="button"
+                                onclick="document.getElementById('delete_modal_{{ loc.id }}').close()"
+                                class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm font-medium transition">
+                                Annuler
+                            </button>
+
+                            <!-- Remplace par ton URL de suppression de location -->
+                            <a href="#"
+                                class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition shadow-sm">
+                                Oui, supprimer
+                            </a>
+                        </div>
+                    </div>
+                </dialog>
+                {% endif %}
+
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="6" class="px-6 py-12 text-center text-sm text-gray-500">
+                        Aucune location enregistrée pour le moment.
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
