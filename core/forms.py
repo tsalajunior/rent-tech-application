@@ -1,5 +1,7 @@
 from django import forms
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
+from datetime import date
 from .models import Agence, Equipement, Client, ProfilEmploye, Categorie, Location
 
 
@@ -216,33 +218,51 @@ class AgenceForm(forms.ModelForm):
 class LocationForm(forms.ModelForm):
     class Meta:
         model = Location
-        fields = ["client", "agence", "date_debut", "retour_prevue", "caution"]
+        fields = ['client', 'agence', 'date_debut', 'retour_prevue', 'caution']
         widgets = {
-            "client": forms.Select(
-                attrs={
-                    "class": "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-renttech-primary"
-                }
-            ),
-            "agence": forms.Select(
-                attrs={
-                    "class": "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-renttech-primary"
-                }
-            ),
-            "date_debut": forms.DateInput(
-                attrs={
-                    "type": "date",
-                    "class": "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-renttech-primary",
-                }
-            ),
-            "retour_prevue": forms.DateInput(
-                attrs={
-                    "type": "date",
-                    "class": "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-renttech-primary",
-                }
-            ),
-            "caution": forms.NumberInput(
-                attrs={
-                    "class": "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-renttech-primary"
-                }
-            ),
+            'client': forms.Select(attrs={'class': 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-renttech-primary'}),
+            'agence': forms.Select(attrs={'class': 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-renttech-primary'}),
+            'date_debut': forms.DateInput(attrs={'type': 'date', 'class': 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-renttech-primary'}),
+            'retour_prevue': forms.DateInput(attrs={'type': 'date', 'class': 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-renttech-primary'}),
+            'caution': forms.NumberInput(attrs={'readonly': 'readonly', 'class': 'w-full px-3 py-2 border border-gray-300 bg-gray-100 text-gray-700 rounded-md focus:outline-none cursor-not-allowed'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        
+        # 1. Empêcher de sélectionner une date antérieure à aujourd'hui directement dans le calendrier HTML5
+        today_str = date.today().isoformat()
+        self.fields['date_debut'].widget.attrs['min'] = today_str
+        self.fields['retour_prevue'].widget.attrs['min'] = today_str
+
+        # 2. Gestion des droits agence et clients (comme vu précédemment)
+        if user and not user.is_superuser:
+            try:
+                agence_employe = user.profil.agence
+                self.fields['agence'].queryset = Agence.objects.filter(id=agence_employe.id)
+                self.initial['agence'] = agence_employe
+                self.fields['client'].queryset = Client.objects.filter(agence=agence_employe)
+            except AttributeError:
+                self.fields['agence'].queryset = Agence.objects.none()
+                self.fields['client'].queryset = Client.objects.none()
+        else:
+            self.fields['agence'].queryset = Agence.objects.all()
+            self.fields['client'].queryset = Client.objects.all()
+
+    # 3. Validation de sécurité côté serveur (Empêche le contournement)
+    def clean_date_debut(self):
+        date_debut = self.cleaned_data.get('date_debut')
+        if date_debut and date_debut < date.today():
+            raise ValidationError("La date de début de location ne peut pas être antérieure à aujourd'hui.")
+        return date_debut
+
+    def clean(self):
+        cleaned_data = super().clean()
+        date_debut = cleaned_data.get('date_debut')
+        retour_prevue = cleaned_data.get('retour_prevue')
+
+        if date_debut and retour_prevue and retour_prevue <= date_debut:
+            self.add_error('retour_prevue', "La date de retour prévue doit être strictement postérieure à la date de début.")
+        
+        return cleaned_data

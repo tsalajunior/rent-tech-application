@@ -633,17 +633,57 @@ def agence_supprimer(request, pk):
 @login_required
 @never_cache
 def creer_location(request):
+    user = request.user
     client_agence_map = dict(Client.objects.values_list("id", "agence_id"))
 
+    # Récupérer les IDs des équipements actuellement engagés dans une location en cours (non retournés)
+    equipements_loues_ids = LocationEquipement.objects.filter(
+        location__retour_reelle__isnull=True
+    ).values_list('equipement_id', flat=True)
+
+    # Filtrer les équipements disponibles :
+    # - Selon l'agence (si non-superuser)
+    # - Exclure ceux qui sont déjà loués (retour_reelle IS NULL)
+    # - Exclure ceux qui sont en maintenance ou indisponibles (ajuste selon les valeurs de ton champ statut, ex: 'disponible')
+    if user.is_superuser:
+        equipements_qs = Equipement.objects.exclude(id__in=equipements_loues_ids)
+    else:
+        try:
+            equipements_qs = Equipement.objects.filter(agence=user.profil.agence).exclude(id__in=equipements_loues_ids)
+        except AttributeError:
+            equipements_qs = Equipement.objects.none()
+
+    # Si tu as un champ 'statut' sur ton modèle Equipement (ex: statut='disponible'), tu peux affiner ainsi :
+    # equipements_qs = equipements_qs.filter(statut='disponible')
+
+    # Dictionnaire des prix pour le JS
+    equipements_prix = {str(eq.id): float(getattr(eq, "prix_journalier", 0.00)) for eq in equipements_qs}
+
     if request.method == "POST":
-        form = LocationForm(request.POST)
+        form = LocationForm(request.POST, user=user)
         equipements_ids = request.POST.getlist("equipements")
 
         if form.is_valid() and equipements_ids:
             try:
                 with transaction.atomic():
+                    # Double sécurité : vérifier au moment du POST qu'aucun équipement n'a été loué entretemps
+                    conflit = LocationEquipement.objects.filter(
+                        equipement_id__in=equipements_ids,
+                        location__retour_reelle__isnull=True
+                    ).exists()
+
+                    if conflit:
+                        messages.error(request, "Un ou plusieurs équipements sélectionnés viennent d'être loués par un autre contrat. Veuillez actualiser votre sélection.")
+                        return redirect("core:creer_location")
+
                     location = form.save(commit=False)
-                    location.employe = request.user
+                    location.employe = user
+                    
+                    if not user.is_superuser:
+                        try:
+                            location.agence = user.profil.agence
+                        except AttributeError:
+                            pass
 
                     duree = (location.retour_prevue - location.date_debut).days
                     if duree <= 0:
@@ -656,27 +696,34 @@ def creer_location(request):
                             "core/pages/location_form.html",
                             {
                                 "form": form,
-                                "equipements": Equipement.objects.all(),
+                                "equipements": equipements_qs,
                                 "client_agence_map": client_agence_map,
                             },
                         )
 
                     montant_total = 0.00
+                    for eq_id in equipements_ids:
+                        equipement = Equipement.objects.get(pk=eq_id)
+                        prix_jour = float(getattr(equipement, "prix_journalier", 0.00))
+                        montant_total += prix_jour * duree
+
+                    location.montant_total = montant_total
+                    location.caution = round(montant_total * 0.50, 2)
                     location.save()
 
                     for eq_id in equipements_ids:
                         equipement = Equipement.objects.get(pk=eq_id)
-                        prix_jour = getattr(equipement, "prix_journalier", 0.00)
-                        montant_total += float(prix_jour) * duree
-
+                        prix_jour = float(getattr(equipement, "prix_journalier", 0.00))
                         LocationEquipement.objects.create(
                             location=location,
                             equipement=equipement,
                             prix_journalier_applique=prix_jour,
                         )
 
-                    location.montant_total = montant_total
-                    location.save()
+                        # 2. Mettre à jour le statut de l'équipement à "loué"
+                        # (Adapte la valeur 'loue' ou 'loué' selon ce qui est défini dans ton modèle Equipement)
+                        equipement.statut = 'loue' 
+                        equipement.save()
 
                     messages.success(
                         request, f"La location #{location.id} a été créée avec succès."
@@ -694,27 +741,34 @@ def creer_location(request):
                     "Veuillez sélectionner au moins un équipement pour cette location.",
                 )
     else:
-        form = LocationForm()
+        form = LocationForm(user=user)
 
-    equipements = Equipement.objects.all()
     return render(
         request,
         "core/pages/location_form.html",
         {
             "form": form,
-            "equipements": equipements,
+            "equipements": equipements_qs,
             "client_agence_map": client_agence_map,
         },
     )
 
-
 @login_required
 @never_cache
 def liste_locations(request):
-    # Les admins voient tout, les employés peuvent aussi tout voir (ou seulement leurs locations, selon ton choix métier)
-    locations = (
-        Location.objects.all()
-        .select_related("client", "agence", "employe")
-        .prefetch_related("lignes_location__equipement")
-    )
+    user = request.user
+    if user.is_superuser:
+        locations = Location.objects.all()
+    else:
+        try:
+            # 👈 Correction : on utilise 'profil' comme dans le dashboard
+            agence_employe = user.profil.agence
+            locations = Location.objects.filter(agence=agence_employe)
+        except AttributeError:
+            locations = Location.objects.none()
+
+    locations = locations.select_related(
+        "client", "agence", "employe"
+    ).prefetch_related("lignes_location__equipement")
+
     return render(request, "core/pages/liste_locations.html", {"locations": locations})
