@@ -58,4 +58,15 @@ urlpatterns = [
     path("locations/", views.liste_locations, name="liste_locations"),
     path("liste_locations/", views.liste_locations),
     path("locations/ajouter/", views.creer_location, name="creer_location"),
+    path("locations/<int:pk>/", views.detail_location, name="detail_location"),
+    path(
+        "locations/<int:pk>/modifier/",
+        views.modifier_location,
+        name="modifier_location",
+    ),
+    path(
+        "locations/<int:pk>/supprimer/",
+        views.supprimer_location,
+        name="supprimer_location",
+    ),
 ]

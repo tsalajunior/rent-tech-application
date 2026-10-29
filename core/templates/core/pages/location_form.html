@@ -112,7 +112,8 @@
 
 <!-- Script de liaison dynamique Client -> Agence ET calcul en temps réel des tarifs -->
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('DOMContentLoaded', function() {
+        // 1. Tous les équipements disponibles passés par Django
         const allEquipements = [
             {% for eq in equipements %}
             {
@@ -124,85 +125,81 @@
             {% endfor %}
         ];
 
-        const selectedIds = [];
+        // 2. Équipements déjà liés si on est en mode modification
+        const initialEquipments = [
+            {% if location %}
+                {% for ligne in location.lignes_location.all %}
+                {
+                    id: "{{ ligne.equipement.id }}",
+                    nom: "{{ ligne.equipement.nom|escapejs }}",
+                    reference: "{{ ligne.equipement.reference|default:'Ref N/A'|escapejs }}",
+                    prix: parseFloat("{{ ligne.prix_journalier_applique|default:0 }}".replace(',', '.'))
+                },
+                {% endfor %}
+            {% endif %}
+        ];
+
+        let selectedIds = [];
+
         const searchInput = document.querySelector('#searchEquipement');
         const suggestionsList = document.querySelector('#suggestionsList');
         const selectedContainer = document.querySelector('#selectedEquipmentsContainer');
         const noMsg = document.querySelector('#noEquipSelectedMsg');
         const hiddenInputsContainer = document.querySelector('#hiddenInputsContainer');
-        const dateDebutInput = document.querySelector('[name="date_debut"]');
-        const retourPrevueInput = document.querySelector('[name="retour_prevue"]');
-        const cautionInput = document.querySelector('[name="caution"]');
-        const montantTotalDisplay = document.querySelector('#displayMontantTotal');
-        const cautionDisplay = document.querySelector('#displayCaution');
-        const totalComptoirDisplay = document.querySelector('#displayTotalComptoir');
 
+        const dateDebutInput = document.querySelector('#id_date_debut');
+        const dateRetourInput = document.querySelector('#id_retour_prevue');
+        const cautionInput = document.querySelector('#id_caution');
+
+        const displayMontantTotal = document.querySelector('#displayMontantTotal');
+        const displayCaution = document.querySelector('#displayCaution');
+        const displayTotalComptoir = document.querySelector('#displayTotalComptoir');
+
+        // 3. Fonction globale de calcul des totaux financiers
         function calculerTotaux() {
-            const dateDebut = dateDebutInput.value
-                ? new Date(`${dateDebutInput.value}T00:00:00Z`)
-                : null;
-            const retourPrevue = retourPrevueInput.value
-                ? new Date(`${retourPrevueInput.value}T00:00:00Z`)
-                : null;
-            const duree = dateDebut && retourPrevue && retourPrevue > dateDebut
-                ? (retourPrevue - dateDebut) / 86400000
-                : 0;
-            const prixJournalierTotal = selectedIds.reduce((total, id) => {
-                const equipement = allEquipements.find(eq => eq.id === id);
-                return total + (equipement ? equipement.prix : 0);
-            }, 0);
-            const montantTotal = prixJournalierTotal * duree;
-            const caution = montantTotal * 0.5;
+            if (!dateDebutInput || !dateRetourInput) return;
 
-            montantTotalDisplay.textContent = `${montantTotal.toFixed(2)} €`;
-            cautionDisplay.textContent = `${caution.toFixed(2)} €`;
-            totalComptoirDisplay.textContent = `${(montantTotal + caution).toFixed(2)} €`;
-            cautionInput.value = caution.toFixed(2);
-        }
+            const dateDebut = new Date(dateDebutInput.value);
+            const dateRetour = new Date(dateRetourInput.value);
 
-        searchInput.addEventListener('input', function () {
-            const query = this.value.toLowerCase().trim();
-            suggestionsList.innerHTML = '';
-
-            if (!query) {
-                suggestionsList.classList.add('hidden');
-                return;
+            let jours = 0;
+            if (dateDebut && dateRetour && dateRetour > dateDebut) {
+                const diffTime = Math.abs(dateRetour - dateDebut);
+                jours = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             }
 
-            const filtered = allEquipements.filter(eq =>
-                (eq.nom.toLowerCase().includes(query) || eq.reference.toLowerCase().includes(query)) &&
-                !selectedIds.includes(eq.id)
-            );
-
-            filtered.forEach(eq => {
-                const div = document.createElement('div');
-                div.className = 'px-4 py-2 hover:bg-gray-100 cursor-pointer flex justify-between items-center text-sm';
-                div.innerHTML = `
-                    <div>
-                        <span class="font-medium text-gray-800">${eq.nom}</span>
-                        <span class="text-xs text-gray-500 ml-2">(${eq.reference})</span>
-                    </div>
-                    <span class="font-semibold text-renttech-primary">${eq.prix.toFixed(2)} € / jour</span>
-                `;
-                div.addEventListener('click', function () {
-                    addEquipement(eq);
-                    searchInput.value = '';
-                    suggestionsList.classList.add('hidden');
-                    calculerTotaux();
-                });
-                suggestionsList.appendChild(div);
+            let prixJournalierTotal = 0;
+            // Récupérer le prix de tous les équipements actuellement sélectionnés dans le conteneur
+            const selectedItems = selectedContainer.querySelectorAll('.selected-item-row');
+            selectedItems.forEach(item => {
+                prixJournalierTotal += parseFloat(item.getAttribute('data-prix')) || 0;
             });
 
-            suggestionsList.classList.toggle('hidden', filtered.length === 0);
-        });
+            const montantTotal = prixJournalierTotal * (jours > 0 ? jours : 0);
+            const caution = montantTotal * 0.50;
+            const totalComptoir = montantTotal + caution;
 
+            if (displayMontantTotal) displayMontantTotal.textContent = montantTotal.toFixed(2) + ' €';
+            if (displayCaution) displayCaution.textContent = caution.toFixed(2) + ' €';
+            if (displayTotalComptoir) displayTotalComptoir.textContent = totalComptoir.toFixed(2) + ' €';
+
+            if (cautionInput) {
+                cautionInput.value = caution.toFixed(2);
+            }
+        }
+
+        // 4. Ajouter un équipement à la sélection
         function addEquipement(eq) {
+            if (selectedIds.includes(eq.id)) return;
+            
             selectedIds.push(eq.id);
-            noMsg.style.display = 'none';
+            if (noMsg) noMsg.style.display = 'none';
 
             const itemDiv = document.createElement('div');
-            itemDiv.className = 'flex items-center justify-between bg-gray-50 border border-gray-200 px-3 py-2 rounded-md text-sm';
+            // Ajout de la classe 'selected-item-row' et de l'attribut data-prix pour faciliter le calcul
+            itemDiv.className = 'selected-item-row flex items-center justify-between bg-gray-50 border border-gray-200 px-3 py-2 rounded-md text-sm mb-2';
             itemDiv.setAttribute('data-id', eq.id);
+            itemDiv.setAttribute('data-prix', eq.prix);
             itemDiv.innerHTML = `
                 <div>
                     <span class="font-medium text-gray-800">${eq.nom}</span>
@@ -212,10 +209,11 @@
                 <button type="button" class="text-red-500 hover:text-red-700 text-xs font-medium transition">Retirer</button>
             `;
 
-            itemDiv.querySelector('button').addEventListener('click', function () {
+            itemDiv.querySelector('button').addEventListener('click', function() {
                 removeEquipement(eq.id, itemDiv);
                 calculerTotaux();
             });
+
             selectedContainer.appendChild(itemDiv);
 
             const hiddenInput = document.createElement('input');
@@ -226,29 +224,80 @@
             hiddenInputsContainer.appendChild(hiddenInput);
         }
 
+        // 5. Retirer un équipement
         function removeEquipement(id, elementNode) {
-            const index = selectedIds.indexOf(id);
-            if (index !== -1) {
-                selectedIds.splice(index, 1);
-            }
+            selectedIds = selectedIds.filter(item => item !== id);
             elementNode.remove();
 
             const hiddenInput = document.getElementById(`hidden-eq-${id}`);
-            if (hiddenInput) {
-                hiddenInput.remove();
-            }
+            if (hiddenInput) hiddenInput.remove();
 
-            if (selectedIds.length === 0) {
+            if (selectedIds.length === 0 && noMsg) {
                 noMsg.style.display = 'block';
             }
         }
 
-        dateDebutInput.addEventListener('change', calculerTotaux);
-        retourPrevueInput.addEventListener('change', calculerTotaux);
+        // 6. Charger les équipements initiaux si on est en mode modification
+        if (initialEquipments.length > 0) {
+            initialEquipments.forEach(eq => {
+                addEquipement(eq);
+            });
+        }
+
+        // Calculer les totaux au chargement initial (pour remplir le récapitulatif en mode modification)
         calculerTotaux();
 
-        document.addEventListener('click', function (e) {
-            if (!searchInput.contains(e.target) && !suggestionsList.contains(e.target)) {
+        // Écouteurs sur les changements de dates
+        if (dateDebutInput && dateRetourInput) {
+            dateDebutInput.addEventListener('change', calculerTotaux);
+            dateRetourInput.addEventListener('change', calculerTotaux);
+        }
+
+        // 7. Gestion de la barre de recherche dynamique
+        if (searchInput && suggestionsList) {
+            searchInput.addEventListener('input', function() {
+                const query = this.value.toLowerCase().trim();
+                suggestionsList.innerHTML = '';
+
+                if (query.length === 0) {
+                    suggestionsList.classList.add('hidden');
+                    return;
+                }
+
+                const filtered = allEquipements.filter(eq => 
+                    (eq.nom.toLowerCase().includes(query) || eq.reference.toLowerCase().includes(query)) &&
+                    !selectedIds.includes(eq.id)
+                );
+
+                if (filtered.length > 0) {
+                    filtered.forEach(eq => {
+                        const div = document.createElement('div');
+                        div.className = 'px-4 py-2 hover:bg-gray-100 cursor-pointer flex justify-between items-center text-sm';
+                        div.innerHTML = `
+                            <div>
+                                <span class="font-medium text-gray-800">${eq.nom}</span>
+                                <span class="text-xs text-gray-500 ml-2">(${eq.reference})</span>
+                            </div>
+                            <span class="font-semibold text-renttech-primary">${eq.prix.toFixed(2)} € / jour</span>
+                        `;
+                        div.addEventListener('click', function() {
+                            addEquipement(eq);
+                            searchInput.value = '';
+                            suggestionsList.classList.add('hidden');
+                            calculerTotaux();
+                        });
+                        suggestionsList.appendChild(div);
+                    });
+                    suggestionsList.classList.remove('hidden');
+                } else {
+                    suggestionsList.classList.add('hidden');
+                }
+            });
+        }
+
+        // Fermer les suggestions si on clique en dehors
+        document.addEventListener('click', function(e) {
+            if (searchInput && suggestionsList && !searchInput.contains(e.target) && !suggestionsList.contains(e.target)) {
                 suggestionsList.classList.add('hidden');
             }
         });
