@@ -92,7 +92,7 @@ class Location(models.Model):
     """
 
     client = models.ForeignKey(
-        Client, on_delete=models.CASCADE, related_name="locations"
+        Client, on_delete=models.PROTECT, related_name="locations"
     )
     agence = models.ForeignKey(
         Agence, on_delete=models.CASCADE, related_name="locations"

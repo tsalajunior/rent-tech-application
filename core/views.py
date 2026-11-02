@@ -366,17 +366,22 @@ def client_modifier(request, pk):
 @login_required
 @never_cache
 def client_supprimer(request, pk):
-    if not request.user.is_superuser:
+    client = get_object_or_404(Client, pk=pk)
+    
+    # 🔒 Vérifier si le client a des locations via le modèle Location directement
+    if Location.objects.filter(client=client).exists():
+        messages.error(
+            request, 
+            f"Impossible de supprimer le client {client.nom} {client.prenom} car il a déjà effectué une ou plusieurs locations."
+        )
         return redirect("core:liste_clients")
 
-    client = get_object_or_404(Client, pk=pk)
     if request.method == "POST":
         client.delete()
+        messages.success(request, "Le client a été supprimé avec succès.")
         return redirect("core:liste_clients")
 
-    return render(
-        request, "core/pages/client_confirmer_suppression.html", {"client": client}
-    )
+    return redirect("core:liste_clients")
 
 
 # Utilisateurs : liste, ajout, modification, suppression
