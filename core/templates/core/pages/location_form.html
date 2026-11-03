@@ -113,148 +113,69 @@
 <!-- Script de liaison dynamique Client -> Agence ET calcul en temps réel des tarifs -->
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // 1. Tous les équipements disponibles passés par Django
+        // 1. Tous les équipements avec leur agence associée (on suppose que tu passes l'ID de l'agence dans l'objet)
         const allEquipements = [
-            {% for eq in equipements %}
+            {% for eq in equipements_tous %} <!-- Assure-toi de passer tous les équipements non loués avec leur agence_id -->
             {
                 id: "{{ eq.id }}",
                 nom: "{{ eq.nom|escapejs }}",
                 reference: "{{ eq.reference|default:'Ref N/A'|escapejs }}",
-                prix: parseFloat("{{ eq.prix_journalier|default:0 }}".replace(',', '.'))
+                prix: parseFloat("{{ eq.prix_journalier|default:0 }}".replace(',', '.')),
+                agenceId: "{{ eq.agence.id }}"
             },
             {% endfor %}
         ];
 
-        // 2. Équipements déjà liés si on est en mode modification
-        const initialEquipments = [
-            {% if location %}
-                {% for ligne in location.lignes_location.all %}
-                {
-                    id: "{{ ligne.equipement.id }}",
-                    nom: "{{ ligne.equipement.nom|escapejs }}",
-                    reference: "{{ ligne.equipement.reference|default:'Ref N/A'|escapejs }}",
-                    prix: parseFloat("{{ ligne.prix_journalier_applique|default:0 }}".replace(',', '.'))
-                },
-                {% endfor %}
-            {% endif %}
-        ];
+        // Map des clients et de leur agence (passée depuis la vue)
+        const clientAgenceMap = {
+            {% for client_id, agence_id in client_agence_map.items %}
+            "{{ client_id }}": "{{ agence_id }}",
+            {% endfor %}
+        };
 
-        let selectedIds = [];
-
+        const agenceSelect = document.querySelector('#id_agence');
+        const clientSelect = document.querySelector('#id_client');
         const searchInput = document.querySelector('#searchEquipement');
         const suggestionsList = document.querySelector('#suggestionsList');
-        const selectedContainer = document.querySelector('#selectedEquipmentsContainer');
-        const noMsg = document.querySelector('#noEquipSelectedMsg');
-        const hiddenInputsContainer = document.querySelector('#hiddenInputsContainer');
 
-        const dateDebutInput = document.querySelector('#id_date_debut');
-        const dateRetourInput = document.querySelector('#id_retour_prevue');
-        const cautionInput = document.querySelector('#id_caution');
+        // Fonction pour filtrer les clients selon l'agence sélectionnée
+        function filtrerClientsEtEquipements() {
+            if (!agenceSelect) return;
+            const selectedAgenceId = agenceSelect.value;
 
-        const displayMontantTotal = document.querySelector('#displayMontantTotal');
-        const displayCaution = document.querySelector('#displayCaution');
-        const displayTotalComptoir = document.querySelector('#displayTotalComptoir');
-
-        // 3. Fonction globale de calcul des totaux financiers
-        function calculerTotaux() {
-            if (!dateDebutInput || !dateRetourInput) return;
-
-            const dateDebut = new Date(dateDebutInput.value);
-            const dateRetour = new Date(dateRetourInput.value);
-
-            let jours = 0;
-            if (dateDebut && dateRetour && dateRetour > dateDebut) {
-                const diffTime = Math.abs(dateRetour - dateDebut);
-                jours = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            // Filtrer le select des clients
+            if (clientSelect) {
+                Array.from(clientSelect.options).forEach(option => {
+                    if (!option.value) return; // Ignorer l'option vide "---------pkl"
+                    const clientAgId = clientAgenceMap[option.value];
+                    if (selectedAgenceId && clientAgId !== selectedAgenceId) {
+                        option.style.display = 'none';
+                    } else {
+                        option.style.display = 'block';
+                    }
+                });
+                // Si le client sélectionné actuellement n'appartient plus à la nouvelle agence, on le réinitialise
+                if (clientSelect.value && clientAgenceMap[clientSelect.value] !== selectedAgenceId) {
+                    clientSelect.value = "";
+                }
             }
 
-            let prixJournalierTotal = 0;
-            // Récupérer le prix de tous les équipements actuellement sélectionnés dans le conteneur
-            const selectedItems = selectedContainer.querySelectorAll('.selected-item-row');
-            selectedItems.forEach(item => {
-                prixJournalierTotal += parseFloat(item.getAttribute('data-prix')) || 0;
-            });
-
-            const montantTotal = prixJournalierTotal * (jours > 0 ? jours : 0);
-            const caution = montantTotal * 0.50;
-            const totalComptoir = montantTotal + caution;
-
-            if (displayMontantTotal) displayMontantTotal.textContent = montantTotal.toFixed(2) + ' €';
-            if (displayCaution) displayCaution.textContent = caution.toFixed(2) + ' €';
-            if (displayTotalComptoir) displayTotalComptoir.textContent = totalComptoir.toFixed(2) + ' €';
-
-            if (cautionInput) {
-                cautionInput.value = caution.toFixed(2);
+            // Réinitialiser la recherche d'équipements si on change d'agence
+            if (searchInput) {
+                searchInput.value = '';
+                if (suggestionsList) suggestionsList.classList.add('hidden');
             }
         }
 
-        // 4. Ajouter un équipement à la sélection
-        function addEquipement(eq) {
-            if (selectedIds.includes(eq.id)) return;
-            
-            selectedIds.push(eq.id);
-            if (noMsg) noMsg.style.display = 'none';
-
-            const itemDiv = document.createElement('div');
-            // Ajout de la classe 'selected-item-row' et de l'attribut data-prix pour faciliter le calcul
-            itemDiv.className = 'selected-item-row flex items-center justify-between bg-gray-50 border border-gray-200 px-3 py-2 rounded-md text-sm mb-2';
-            itemDiv.setAttribute('data-id', eq.id);
-            itemDiv.setAttribute('data-prix', eq.prix);
-            itemDiv.innerHTML = `
-                <div>
-                    <span class="font-medium text-gray-800">${eq.nom}</span>
-                    <span class="text-xs text-gray-500 ml-2">(${eq.reference})</span>
-                    <span class="text-xs font-semibold text-renttech-primary ml-4">${eq.prix.toFixed(2)} € / jour</span>
-                </div>
-                <button type="button" class="text-red-500 hover:text-red-700 text-xs font-medium transition">Retirer</button>
-            `;
-
-            itemDiv.querySelector('button').addEventListener('click', function() {
-                removeEquipement(eq.id, itemDiv);
-                calculerTotaux();
-            });
-
-            selectedContainer.appendChild(itemDiv);
-
-            const hiddenInput = document.createElement('input');
-            hiddenInput.type = 'hidden';
-            hiddenInput.name = 'equipements';
-            hiddenInput.value = eq.id;
-            hiddenInput.id = `hidden-eq-${eq.id}`;
-            hiddenInputsContainer.appendChild(hiddenInput);
+        // Écouter le changement d'agence
+        if (agenceSelect) {
+            agenceSelect.addEventListener('change', filtrerClientsEtEquipements);
+            // Exécuter au chargement au cas où une agence est déjà pré-sélectionnée
+            filtrerClientsEtEquipements();
         }
 
-        // 5. Retirer un équipement
-        function removeEquipement(id, elementNode) {
-            selectedIds = selectedIds.filter(item => item !== id);
-            elementNode.remove();
-
-            const hiddenInput = document.getElementById(`hidden-eq-${id}`);
-            if (hiddenInput) hiddenInput.remove();
-
-            if (selectedIds.length === 0 && noMsg) {
-                noMsg.style.display = 'block';
-            }
-        }
-
-        // 6. Charger les équipements initiaux si on est en mode modification
-        if (initialEquipments.length > 0) {
-            initialEquipments.forEach(eq => {
-                addEquipement(eq);
-            });
-        }
-
-        // Calculer les totaux au chargement initial (pour remplir le récapitulatif en mode modification)
-        calculerTotaux();
-
-        // Écouteurs sur les changements de dates
-        if (dateDebutInput && dateRetourInput) {
-            dateDebutInput.addEventListener('change', calculerTotaux);
-            dateRetourInput.addEventListener('change', calculerTotaux);
-        }
-
-        // 7. Gestion de la barre de recherche dynamique
-        if (searchInput && suggestionsList) {
+        // Adaptation de la recherche dynamique pour ne proposer que les équipements de l'agence sélectionnée
+        if (searchInput) {
             searchInput.addEventListener('input', function() {
                 const query = this.value.toLowerCase().trim();
                 suggestionsList.innerHTML = '';
@@ -264,7 +185,10 @@
                     return;
                 }
 
+                const currentAgenceId = agenceSelect ? agenceSelect.value : '';
+
                 const filtered = allEquipements.filter(eq => 
+                    (!currentAgenceId || eq.agenceId === currentAgenceId) &&
                     (eq.nom.toLowerCase().includes(query) || eq.reference.toLowerCase().includes(query)) &&
                     !selectedIds.includes(eq.id)
                 );
@@ -294,13 +218,6 @@
                 }
             });
         }
-
-        // Fermer les suggestions si on clique en dehors
-        document.addEventListener('click', function(e) {
-            if (searchInput && suggestionsList && !searchInput.contains(e.target) && !suggestionsList.contains(e.target)) {
-                suggestionsList.classList.add('hidden');
-            }
-        });
     });
 </script>
 {% endblock %}

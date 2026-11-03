@@ -1,11 +1,15 @@
+from io import BytesIO
+
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
+from django.http import HttpResponse
 
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth import update_session_auth_hash
 from django.contrib import messages
 from django.db import transaction
+from django.utils import timezone
 from .models import (
     Agence,
     Categorie,
@@ -19,6 +23,12 @@ from django.views.decorators.cache import never_cache
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import mm
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from xml.sax.saxutils import escape
 from .forms import (
     ClientForm,
     EquipementForm,
@@ -367,12 +377,12 @@ def client_modifier(request, pk):
 @never_cache
 def client_supprimer(request, pk):
     client = get_object_or_404(Client, pk=pk)
-    
+
     # 🔒 Vérifier si le client a des locations via le modèle Location directement
     if Location.objects.filter(client=client).exists():
         messages.error(
-            request, 
-            f"Impossible de supprimer le client {client.nom} {client.prenom} car il a déjà effectué une ou plusieurs locations."
+            request,
+            f"Impossible de supprimer le client {client.nom} {client.prenom} car il a déjà effectué une ou plusieurs locations.",
         )
         return redirect("core:liste_clients")
 
@@ -646,19 +656,33 @@ def creer_location(request):
         location__retour_reelle__isnull=True
     ).values_list("equipement_id", flat=True)
 
-    # Filtrer les équipements disponibles :
-    # - Selon l'agence (si non-superuser)
-    # - Exclure ceux qui sont déjà loués (retour_reelle IS NULL)
-    # - Exclure ceux qui sont en maintenance ou indisponibles (ajuste selon les valeurs de ton champ statut, ex: 'disponible')
-    if user.is_superuser:
-        equipements_qs = Equipement.objects.exclude(id__in=equipements_loues_ids)
-    else:
+    # Déterminer l'agence cible pour le filtrage initial des équipements
+    agence_cible = None
+    if request.method == "POST":
+        agence_id_post = request.POST.get("agence")
+        if agence_id_post:
+            try:
+                agence_cible = Agence.objects.get(pk=agence_id_post)
+            except Agence.DoesNotExist:
+                pass
+
+    if not agence_cible and not user.is_superuser:
         try:
-            equipements_qs = Equipement.objects.filter(
-                agence=user.profil.agence
-            ).exclude(id__in=equipements_loues_ids)
+            agence_cible = user.profil.agence
         except AttributeError:
-            equipements_qs = Equipement.objects.none()
+            pass
+
+    # Filtrer les équipements disponibles :
+    # - Si une agence cible est définie (employé ou admin ayant choisi une agence), on restreint strictement à cette agence.
+    # - Si l'admin n'a pas encore choisi d'agence spécifique (en GET par exemple), on peut afficher tous les équipements disponibles.
+    # - On exclut toujours ceux qui sont déjà loués.
+    equipements_qs = Equipement.objects.exclude(id__in=equipements_loues_ids)
+
+    if agence_cible:
+        equipements_qs = equipements_qs.filter(agence=agence_cible)
+    elif not user.is_superuser:
+        # Fallback de sécurité si l'employé n'a pas d'agence rattachée
+        equipements_qs = Equipement.objects.none()
 
     # Si tu as un champ 'statut' sur ton modèle Equipement (ex: statut='disponible'), tu peux affiner ainsi :
     # equipements_qs = equipements_qs.filter(statut='disponible')
@@ -732,8 +756,7 @@ def creer_location(request):
                             prix_journalier_applique=prix_jour,
                         )
 
-                        # 2. Mettre à jour le statut de l'équipement à "loué"
-                        # (Adapte la valeur 'loue' ou 'loué' selon ce qui est défini dans ton modèle Equipement)
+                        # Mettre à jour le statut de l'équipement à "loué"
                         equipement.statut = "loue"
                         equipement.save()
 
@@ -814,6 +837,109 @@ def detail_location(request, pk):
 
 @login_required
 @never_cache
+def telecharger_location_pdf(request, pk):
+    location = get_object_or_404(
+        Location.objects.select_related("client", "agence", "employe").prefetch_related(
+            "lignes_location__equipement"
+        ),
+        pk=pk,
+    )
+    user = request.user
+
+    if not user.is_superuser:
+        try:
+            if location.agence != user.profil.agence:
+                return redirect("core:liste_locations")
+        except AttributeError:
+            return redirect("core:liste_locations")
+
+    buffer = BytesIO()
+    document = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=20 * mm,
+        leftMargin=20 * mm,
+        topMargin=20 * mm,
+        bottomMargin=20 * mm,
+    )
+    styles = getSampleStyleSheet()
+    elements = [
+        Paragraph(f"Contrat de location #{location.id}", styles["Title"]),
+        Spacer(1, 8 * mm),
+        Paragraph(
+            f"Agence : {escape(location.agence.nom)}<br/>"
+            f"Créé par : {escape(location.employe.username if location.employe else 'N/A')}",
+            styles["BodyText"],
+        ),
+        Spacer(1, 5 * mm),
+        Paragraph("Informations client", styles["Heading2"]),
+        Paragraph(
+            f"{escape(location.client.nom)} {escape(location.client.prenom or '')}<br/>"
+            f"Email : {escape(location.client.email or 'N/A')}<br/>"
+            f"Téléphone : {escape(location.client.telephone or 'N/A')}",
+            styles["BodyText"],
+        ),
+        Spacer(1, 5 * mm),
+        Paragraph("Période de location", styles["Heading2"]),
+        Paragraph(
+            f"Début : {location.date_debut:%d/%m/%Y}<br/>"
+            f"Retour prévu : {location.retour_prevue:%d/%m/%Y}",
+            styles["BodyText"],
+        ),
+        Spacer(1, 5 * mm),
+        Paragraph("Équipements loués", styles["Heading2"]),
+    ]
+
+    equipment_rows = [["Référence & nom", "Prix journalier appliqué"]]
+    equipment_rows.extend(
+        [
+            [
+                Paragraph(
+                    f"{escape(ligne.equipement.nom)} "
+                    f"({escape(ligne.equipement.reference)})",
+                    styles["BodyText"],
+                ),
+                f"{ligne.prix_journalier_applique} € / jour",
+            ]
+            for ligne in location.lignes_location.all()
+        ]
+    )
+    equipment_table = Table(equipment_rows, colWidths=[95 * mm, 75 * mm], repeatRows=1)
+    equipment_table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f3f4f6")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#374151")),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d1d5db")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 8),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ]
+        )
+    )
+    elements.extend(
+        [
+            equipment_table,
+            Spacer(1, 8 * mm),
+            Paragraph("Récapitulatif financier", styles["Heading2"]),
+            Paragraph(
+                f"Montant total : {location.montant_total} €<br/>"
+                f"Caution (50 %) : {location.caution} €",
+                styles["BodyText"],
+            ),
+        ]
+    )
+    document.build(elements)
+
+    response = HttpResponse(buffer.getvalue(), content_type="application/pdf")
+    response["Content-Disposition"] = (
+        f'attachment; filename="location-{location.id}.pdf"'
+    )
+    return response
+
+
 @login_required
 @never_cache
 def modifier_location(request, pk):
@@ -838,16 +964,23 @@ def modifier_location(request, pk):
                 with transaction.atomic():
                     # 1. Libérer les anciens équipements
                     ancienne_lignes = location.lignes_location.all()
-                    anciens_equipements_ids = [ligne.equipement_id for ligne in ancienne_lignes]
-                    Equipement.objects.filter(id__in=anciens_equipements_ids).update(statut='disponible')
+                    anciens_equipements_ids = [
+                        ligne.equipement_id for ligne in ancienne_lignes
+                    ]
+                    Equipement.objects.filter(id__in=anciens_equipements_ids).update(
+                        statut="disponible"
+                    )
                     ancienne_lignes.delete()
 
                     # 2. Sauvegarder les modifications du formulaire
                     loc_modifiee = form.save(commit=False)
-                    
+
                     duree = (loc_modifiee.retour_prevue - loc_modifiee.date_debut).days
                     if duree <= 0:
-                        messages.error(request, "La date de retour prévue doit être postérieure à la date de début.")
+                        messages.error(
+                            request,
+                            "La date de retour prévue doit être postérieure à la date de début.",
+                        )
                         return redirect("core:modifier_location", pk=pk)
 
                     montant_total = 0.00
@@ -864,16 +997,19 @@ def modifier_location(request, pk):
                     for eq_id in equipements_ids:
                         equipement = Equipement.objects.get(pk=eq_id)
                         prix_jour = float(getattr(equipement, "prix_journalier", 0.00))
-                        
+
                         LocationEquipement.objects.create(
                             location=loc_modifiee,
                             equipement=equipement,
                             prix_journalier_applique=prix_jour,
                         )
-                        equipement.statut = 'loue'
+                        equipement.statut = "loue"
                         equipement.save()
 
-                    messages.success(request, f"La location #{location.id} a été modifiée avec succès.")
+                    messages.success(
+                        request,
+                        f"La location #{location.id} a été modifiée avec succès.",
+                    )
                     return redirect("core:liste_locations")
 
             except Exception as e:
@@ -885,14 +1021,22 @@ def modifier_location(request, pk):
         form = LocationForm(instance=location, user=user)
 
     # Récupérer les équipements disponibles (en excluant les autres locations en cours, mais en gardant ceux de CETte location)
-    equipements_actuels_ids = list(location.lignes_location.values_list('equipement_id', flat=True))
-    equipements_autres_loues = LocationEquipement.objects.filter(location__retour_reelle__isnull=True).exclude(location=location).values_list('equipement_id', flat=True)
+    equipements_actuels_ids = list(
+        location.lignes_location.values_list("equipement_id", flat=True)
+    )
+    equipements_autres_loues = (
+        LocationEquipement.objects.filter(location__retour_reelle__isnull=True)
+        .exclude(location=location)
+        .values_list("equipement_id", flat=True)
+    )
 
     if user.is_superuser:
         equipements = Equipement.objects.exclude(id__in=equipements_autres_loues)
     else:
         try:
-            equipements = Equipement.objects.filter(agence=user.profil.agence).exclude(id__in=equipements_autres_loues)
+            equipements = Equipement.objects.filter(agence=user.profil.agence).exclude(
+                id__in=equipements_autres_loues
+            )
         except AttributeError:
             equipements = Equipement.objects.none()
 
@@ -904,10 +1048,11 @@ def modifier_location(request, pk):
             "equipements": equipements,
             "client_agence_map": client_agence_map,
             "location": location,
-            "equipements_actuels_ids": equipements_actuels_ids, # 👈 On transmet les IDs actuels au template
+            "equipements_actuels_ids": equipements_actuels_ids,  # 👈 On transmet les IDs actuels au template
             "action": "Modifier",
         },
     )
+
 
 @login_required
 @never_cache
@@ -944,3 +1089,88 @@ def supprimer_location(request, pk):
         return redirect("core:liste_locations")
 
     return redirect("core:liste_locations")
+
+
+@login_required
+@never_cache
+def retourner_location(request, pk):
+    location = get_object_or_404(Location, pk=pk)
+    user = request.user
+
+    if not user.is_superuser:
+        try:
+            if location.agence != user.profil.agence:
+                return redirect("core:liste_locations")
+        except AttributeError:
+            return redirect("core:liste_locations")
+
+    if request.method == "POST":
+        if not location.retour_reelle:
+            with transaction.atomic():
+                # 1. Marquer la location comme retournée aujourd'hui
+                location.retour_reelle = timezone.now().date()
+                location.save()
+
+                # 2. Remettre chaque équipement au statut 'disponible' de manière explicite
+                for ligne in location.lignes_location.all():
+                    equipement = ligne.equipement
+                    equipement.statut = "disponible"  # Vérifie bien si ton modèle utilise des minuscules ou majuscules (ex: 'DISPONIBLE')
+                    equipement.save()
+
+                messages.success(
+                    request,
+                    f"La location #{location.id} a été clôturée avec succès. Les équipements sont de nouveau disponibles.",
+                )
+        else:
+            messages.warning(
+                request, f"La location #{location.id} était déjà clôturée."
+            )
+
+        return redirect("core:liste_locations")
+
+    return redirect("core:detail_location", pk=pk)
+
+
+@login_required
+@never_cache
+def etendre_location(request, pk):
+    location = get_object_or_404(Location, pk=pk)
+
+    if request.method == "POST":
+        nouvelle_date_str = request.POST.get("nouvelle_date")
+        if nouvelle_date_str:
+            nouvelle_date = timezone.datetime.strptime(
+                nouvelle_date_str, "%Y-%m-%d"
+            ).date()
+
+            if nouvelle_date <= location.retour_prevue:
+                messages.error(
+                    request,
+                    "La nouvelle date de retour doit être postérieure à l'ancienne date prévue.",
+                )
+                return redirect("core:detail_location", pk=pk)
+
+            with transaction.atomic():
+                # Calcul de la nouvelle durée totale à partir du début initial
+                ancienne_duree = (location.retour_prevue - location.date_debut).days
+                nouvelle_duree = (nouvelle_date - location.date_debut).days
+
+                # Recalcul proportionnel ou basé sur le prix journalier des lignes actuelles
+                # Méthode simple : on ajuste le montant total par rapport au ratio des jours ou en recalculant
+                prix_journalier_total = sum(
+                    ligne.prix_journalier_applique
+                    for ligne in location.lignes_location.all()
+                )
+
+                nouveau_montant = prix_journalier_total * nouvelle_duree
+                location.montant_total = nouveau_montant
+                location.caution = round(nouveau_montant * 0.50, 2)
+                location.retour_prevue = nouvelle_date
+                location.save()
+
+                messages.success(
+                    request,
+                    f"La location #{location.id} a été prolongée jusqu'au {nouvelle_date.strftime('%d/%m/%Y')}.",
+                )
+
+    return redirect("core:detail_location", pk=pk)

@@ -9,9 +9,14 @@
             <h1 class="text-xl font-bold text-renttech-dark">Contrat de location #{{ location.id }}</h1>
             <p class="text-gray-500 text-sm">Agence : {{ location.agence.nom }} | Créé par : {{ location.employe.username }}</p>
         </div>
-        <a href="{% url 'core:liste_locations' %}" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm font-medium transition">
-            Retour à la liste
-        </a>
+        <div class="flex gap-2">
+            <a href="{% url 'core:telecharger_location_pdf' location.id %}" class="px-4 py-2 bg-renttech-primary hover:opacity-90 text-white rounded-md text-sm font-medium transition">
+                Générer le PDF
+            </a>
+            <a href="{% url 'core:liste_locations' %}" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm font-medium transition">
+                Retour à la liste
+            </a>
+        </div>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">

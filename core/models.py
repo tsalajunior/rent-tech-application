@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 
 class Agence(models.Model):
@@ -104,6 +105,17 @@ class Location(models.Model):
         blank=True,
         related_name="locations_enregistrees",
     )
+
+    @property
+    def statut(self):
+        aujourd_hui = timezone.now().date()
+        
+        if self.retour_reelle:
+            return "terminee"
+        elif aujourd_hui > self.retour_prevue:
+            return "etendue" 
+        else:
+            return "en_cours"
 
     date_debut = models.DateField()
     retour_prevue = models.DateField()

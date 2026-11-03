@@ -60,6 +60,11 @@ urlpatterns = [
     path("locations/ajouter/", views.creer_location, name="creer_location"),
     path("locations/<int:pk>/", views.detail_location, name="detail_location"),
     path(
+        "locations/<int:pk>/pdf/",
+        views.telecharger_location_pdf,
+        name="telecharger_location_pdf",
+    ),
+    path(
         "locations/<int:pk>/modifier/",
         views.modifier_location,
         name="modifier_location",
@@ -68,5 +73,10 @@ urlpatterns = [
         "locations/<int:pk>/supprimer/",
         views.supprimer_location,
         name="supprimer_location",
+    ),
+    path(
+        "locations/<int:pk>/retour/",
+        views.retourner_location,
+        name="retourner_location",
     ),
 ]
