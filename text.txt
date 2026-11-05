@@ -53,10 +53,10 @@ docker exec -it renttech_web_container python manage.py migrate
 * CRUD d'une location avec message d'avertissement ✅
 * client ayant effectué une location ne peut pas être supprimé ✅
 * menu gauche responsive ✅
+* générer factures pdf (action : imprimer) ✅
+* afficher la date réelle de retour sur la facture lors du retour de l'équipement ✅
+* ajouter le logo, la description et le nom de l'entreprise sur la facture pdf ✅
 * statut d'une location (en cours, terminée, étendue) & gestion des retours d'équipements (un
 équipement retourné passe de loué à disponible)
-* générer factures pdf (action : imprimer) ✅
-* afficher la date réelle de retour sur la facture lors du retour de l'équipement
-* ajouter le logo, la description et le nom de l'entreprise sur la facture pdf
 * étendre la période de location (pénalités)
 * créer le fichier pwa

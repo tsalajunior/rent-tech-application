@@ -47,10 +47,20 @@ class LocationTemplateTests(SimpleTestCase):
                     lignes_location=SimpleNamespace(all=lambda: []),
                     montant_total=Decimal("100.00"),
                     caution=Decimal("50.00"),
-                )
+                ),
+                "renttech_name": "RentTech",
+                "renttech_description": (
+                    "Système de location de matériels informatiques et électroniques."
+                ),
             }
         )
 
+        self.assertIn("RentTech_Logo.jpg", html)
+        self.assertIn("RentTech", html)
+        self.assertIn(
+            "Système de location de matériels informatiques et électroniques.",
+            html,
+        )
         self.assertIn("Générer le PDF", html)
         self.assertIn(reverse("core:telecharger_location_pdf", args=[12]), html)
 
@@ -95,6 +105,7 @@ class LocationPdfTests(SimpleTestCase):
             ),
             date_debut=date(2026, 11, 1),
             retour_prevue=date(2026, 11, 5),
+            retour_reelle=None,
             lignes_location=SimpleNamespace(
                 all=lambda: [
                     SimpleNamespace(
@@ -120,3 +131,4 @@ class LocationPdfTests(SimpleTestCase):
             'attachment; filename="location-12.pdf"',
         )
         self.assertTrue(response.content.startswith(b"%PDF-"))
+        self.assertIn(b"/Subtype /Image", response.content)

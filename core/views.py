@@ -1,5 +1,6 @@
 from io import BytesIO
 
+from django.contrib.staticfiles import finders
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
@@ -27,7 +28,14 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import (
+    Image,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
 from xml.sax.saxutils import escape
 from .forms import (
     ClientForm,
@@ -37,6 +45,11 @@ from .forms import (
     CategorieForm,
     AgenceForm,
     LocationForm,
+)
+
+RENTTECH_NAME = "RentTech"
+RENTTECH_DESCRIPTION = (
+    "Système de location de matériels informatiques et électroniques."
 )
 
 
@@ -672,25 +685,10 @@ def creer_location(request):
         except AttributeError:
             pass
 
-    # Filtrer les équipements disponibles :
-    # - Si une agence cible est définie (employé ou admin ayant choisi une agence), on restreint strictement à cette agence.
-    # - Si l'admin n'a pas encore choisi d'agence spécifique (en GET par exemple), on peut afficher tous les équipements disponibles.
-    # - On exclut toujours ceux qui sont déjà loués.
-    equipements_qs = Equipement.objects.exclude(id__in=equipements_loues_ids)
-
-    if agence_cible:
-        equipements_qs = equipements_qs.filter(agence=agence_cible)
-    elif not user.is_superuser:
-        # Fallback de sécurité si l'employé n'a pas d'agence rattachée
-        equipements_qs = Equipement.objects.none()
-
-    # Si tu as un champ 'statut' sur ton modèle Equipement (ex: statut='disponible'), tu peux affiner ainsi :
-    # equipements_qs = equipements_qs.filter(statut='disponible')
-
-    # Dictionnaire des prix pour le JS
-    equipements_prix = {
-        str(eq.id): float(getattr(eq, "prix_journalier", 0.00)) for eq in equipements_qs
-    }
+    # Filtrer tous les équipements disponibles (non loués) pour le JS
+    equipements_tous = Equipement.objects.exclude(
+        id__in=equipements_loues_ids
+    ).select_related("agence")
 
     if request.method == "POST":
         form = LocationForm(request.POST, user=user)
@@ -732,7 +730,7 @@ def creer_location(request):
                             "core/pages/location_form.html",
                             {
                                 "form": form,
-                                "equipements": equipements_qs,
+                                "equipements_tous": equipements_tous,
                                 "client_agence_map": client_agence_map,
                             },
                         )
@@ -783,8 +781,9 @@ def creer_location(request):
         "core/pages/location_form.html",
         {
             "form": form,
-            "equipements": equipements_qs,
+            "equipements_tous": equipements_tous,
             "client_agence_map": client_agence_map,
+            "action": "Créer",
         },
     )
 
@@ -832,7 +831,15 @@ def detail_location(request, pk):
         except AttributeError:
             return redirect("core:liste_locations")
 
-    return render(request, "core/pages/location_detail.html", {"location": location})
+    return render(
+        request,
+        "core/pages/location_detail.html",
+        {
+            "location": location,
+            "renttech_name": RENTTECH_NAME,
+            "renttech_description": RENTTECH_DESCRIPTION,
+        },
+    )
 
 
 @login_required
@@ -863,7 +870,43 @@ def telecharger_location_pdf(request, pk):
         bottomMargin=20 * mm,
     )
     styles = getSampleStyleSheet()
+    logo_path = finders.find("core/images/RentTech_Logo.jpg")
+    if logo_path is None:
+        raise FileNotFoundError(
+            "Logo RentTech introuvable dans les fichiers statiques."
+        )
+
+    company_header = Table(
+        [
+            [
+                Image(logo_path, width=28 * mm, height=28 * mm, kind="proportional"),
+                [
+                    Paragraph(RENTTECH_NAME, styles["Heading1"]),
+                    Paragraph(RENTTECH_DESCRIPTION, styles["BodyText"]),
+                ],
+            ]
+        ],
+        colWidths=[35 * mm, 135 * mm],
+    )
+    company_header.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]
+        )
+    )
+    retour_reel = (
+        location.retour_reelle.strftime("%d/%m/%Y")
+        if location.retour_reelle
+        else "N/A"
+    )
     elements = [
+        company_header,
+        Spacer(1, 8 * mm),
         Paragraph(f"Contrat de location #{location.id}", styles["Title"]),
         Spacer(1, 8 * mm),
         Paragraph(
@@ -883,7 +926,8 @@ def telecharger_location_pdf(request, pk):
         Paragraph("Période de location", styles["Heading2"]),
         Paragraph(
             f"Début : {location.date_debut:%d/%m/%Y}<br/>"
-            f"Retour prévu : {location.retour_prevue:%d/%m/%Y}",
+            f"Retour prévu : {location.retour_prevue:%d/%m/%Y}<br/>",
+            # f"Retour réel : {location.retour_reelle:%d/%m/%Y if location.retour_reelle else 'Location non retournée'}<br/>",
             styles["BodyText"],
         ),
         Spacer(1, 5 * mm),
@@ -1030,25 +1074,18 @@ def modifier_location(request, pk):
         .values_list("equipement_id", flat=True)
     )
 
-    if user.is_superuser:
-        equipements = Equipement.objects.exclude(id__in=equipements_autres_loues)
-    else:
-        try:
-            equipements = Equipement.objects.filter(agence=user.profil.agence).exclude(
-                id__in=equipements_autres_loues
-            )
-        except AttributeError:
-            equipements = Equipement.objects.none()
+    # On récupère tous les équipements non loués ailleurs (les équipements actuels de cette location y compris)
+    equipements_tous = Equipement.objects.exclude(id__in=equipements_autres_loues).select_related('agence')
 
     return render(
         request,
         "core/pages/location_form.html",
         {
             "form": form,
-            "equipements": equipements,
+            "equipements_tous": equipements_tous,
             "client_agence_map": client_agence_map,
             "location": location,
-            "equipements_actuels_ids": equipements_actuels_ids,  # 👈 On transmet les IDs actuels au template
+            "equipements_actuels_ids": equipements_actuels_ids,
             "action": "Modifier",
         },
     )
