@@ -926,8 +926,8 @@ def telecharger_location_pdf(request, pk):
         Paragraph("Période de location", styles["Heading2"]),
         Paragraph(
             f"Début : {location.date_debut:%d/%m/%Y}<br/>"
-            f"Retour prévu : {location.retour_prevue:%d/%m/%Y}<br/>",
-            # f"Retour réel : {location.retour_reelle:%d/%m/%Y if location.retour_reelle else 'Location non retournée'}<br/>",
+            f"Retour prévu : {location.retour_prevue:%d/%m/%Y}<br/>"
+            f"Retour réel : {retour_reel}",
             styles["BodyText"],
         ),
         Spacer(1, 5 * mm),
@@ -1145,7 +1145,7 @@ def retourner_location(request, pk):
         if not location.retour_reelle:
             with transaction.atomic():
                 # 1. Marquer la location comme retournée aujourd'hui
-                location.retour_reelle = timezone.now().date()
+                location.retour_reelle = timezone.localdate()
                 location.save()
 
                 # 2. Remettre chaque équipement au statut 'disponible' de manière explicite

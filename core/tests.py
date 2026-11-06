@@ -6,7 +6,9 @@ from datetime import date
 from decimal import Decimal
 from unittest.mock import patch
 
-from .views import liste_locations, telecharger_location_pdf
+from reportlab.platypus import Paragraph as ReportLabParagraph
+
+from .views import liste_locations, retourner_location, telecharger_location_pdf
 
 
 class LocationUrlTests(SimpleTestCase):
@@ -44,6 +46,7 @@ class LocationTemplateTests(SimpleTestCase):
                     ),
                     date_debut=date(2026, 11, 1),
                     retour_prevue=date(2026, 11, 5),
+                    retour_reelle=date(2026, 11, 7),
                     lignes_location=SimpleNamespace(all=lambda: []),
                     montant_total=Decimal("100.00"),
                     caution=Decimal("50.00"),
@@ -63,6 +66,7 @@ class LocationTemplateTests(SimpleTestCase):
         )
         self.assertIn("Générer le PDF", html)
         self.assertIn(reverse("core:telecharger_location_pdf", args=[12]), html)
+        self.assertIn("Retour réel :</span> 07/11/2026", html)
 
     def test_location_form_renders_client_agency_map_as_json(self):
         html = get_template("core/pages/location_form.html").render(
@@ -105,7 +109,7 @@ class LocationPdfTests(SimpleTestCase):
             ),
             date_debut=date(2026, 11, 1),
             retour_prevue=date(2026, 11, 5),
-            retour_reelle=None,
+            retour_reelle=date(2026, 11, 7),
             lignes_location=SimpleNamespace(
                 all=lambda: [
                     SimpleNamespace(
@@ -122,7 +126,10 @@ class LocationPdfTests(SimpleTestCase):
         request = RequestFactory().get("/locations/12/pdf/")
         request.user = SimpleNamespace(is_superuser=True)
 
-        with patch("core.views.get_object_or_404", return_value=location):
+        with (
+            patch("core.views.get_object_or_404", return_value=location),
+            patch("core.views.Paragraph", wraps=ReportLabParagraph) as paragraph,
+        ):
             response = telecharger_location_pdf.__wrapped__(request, 12)
 
         self.assertEqual(response["Content-Type"], "application/pdf")
@@ -132,3 +139,32 @@ class LocationPdfTests(SimpleTestCase):
         )
         self.assertTrue(response.content.startswith(b"%PDF-"))
         self.assertIn(b"/Subtype /Image", response.content)
+        self.assertTrue(
+            any(
+                "Retour réel : 07/11/2026" in call.args[0]
+                for call in paragraph.call_args_list
+            )
+        )
+
+
+class LocationReturnTests(SimpleTestCase):
+    def test_closing_location_uses_local_return_date(self):
+        returned_on = date(2026, 11, 7)
+        location = SimpleNamespace(
+            id=12,
+            retour_reelle=None,
+            lignes_location=SimpleNamespace(all=lambda: []),
+            save=lambda: None,
+        )
+        request = RequestFactory().post("/locations/12/retourner/")
+        request.user = SimpleNamespace(is_superuser=True)
+
+        with (
+            patch("core.views.get_object_or_404", return_value=location),
+            patch("core.views.timezone.localdate", return_value=returned_on),
+            patch("core.views.messages.success"),
+            patch("core.views.transaction.atomic"),
+        ):
+            retourner_location.__wrapped__(request, 12)
+
+        self.assertEqual(location.retour_reelle, returned_on)

@@ -3,7 +3,7 @@
 {% block title %}RentTech - Gestion des locations{% endblock %}
 
 {% block content %}
-<div class="bg-white shadow rounded-lg overflow-hidden border border-gray-100 max-w-7xl mx-auto mt-6 mb-12">
+<div class="bg-white shadow rounded-lg border border-gray-100 max-w-7xl mx-auto mt-6 mb-12">
     <!-- En-tête du tableau avec le bouton d'ajout global -->
     <div class="p-6 border-b border-gray-100 flex justify-between items-center">
         <div>
@@ -30,7 +30,8 @@
                     </th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Montant
                         Total</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut
+                    </th>
                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions
                     </th>
                 </tr>
@@ -66,45 +67,62 @@
                             class="px-2.5 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Terminée</span>
                         {% endif %}
                     </td>
-      
-                    <!-- Colonne des actions sécurisée selon le rôle -->
-                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
-                        <!-- Le détail est accessible à tout le monde -->
-                        <a href="{% url 'core:detail_location' loc.id %}"
-                            class="text-gray-600 hover:text-renttech-primary">Détails</a>
 
-                        {% if request.user.is_superuser %}
-                        <!-- Actions réservées STRICTEMENT à l'administrateur -->
-                        <a href="{% url 'core:modifier_location' loc.id %}"
-                            class="text-renttech-primary hover:underline">Modifier</a>
-
-                        {% if not loc.retour_reelle %}
-                        <!-- Bouton de retour rapide -->
-                        <form action="{% url 'core:retourner_location' loc.id %}" method="POST" class="inline">
-                            {% csrf_token %}
-                            <button type="submit" class="text-green-600 hover:text-green-800 font-semibold"
-                                onclick="return confirm('Confirmer le retour et la restitution des équipements ?')">
-                                Clôturer / Retour
+                    <!-- Colonne des actions avec un menu déroulant géré en JavaScript -->
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
+                        <div class="relative inline-block text-left">
+                            <button type="button" onclick="toggleDropdown('menu-{{ loc.id }}', event)"
+                                class="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-md transition select-none">
+                                Actions
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 9l-7 7-7-7"></path>
+                                </svg>
                             </button>
-                        </form>
-                        {% endif %}
 
-                        <button type="button" onclick="document.getElementById('delete_modal_{{ loc.id }}').showModal()"
-                            class="text-red-600 hover:text-red-800 transition cursor-pointer">
-                            Supprimer
-                        </button>
-                        {% else %}
-                        <!-- Pour un simple user : aucun droit de modification/suppression -->
-                        <span class="text-gray-300 cursor-not-allowed select-none text-xs"
-                            title="Réservé à l'administrateur">
-                            Verrouillé
-                        </span>
-                        {% endif %}
+                            <!-- Menu déroulant positionné en absolu -->
+                            <div id="menu-{{ loc.id }}"
+                                class="action-dropdown hidden absolute right-0 mt-2 z-50 w-48 bg-white border border-gray-200 rounded-md shadow-2xl py-1 text-left ring-1 ring-black ring-opacity-5 focus:outline-none">
+                                <!-- Détails (toujours accessible pour consultation) -->
+                                <a href="{% url 'core:detail_location' loc.id %}"
+                                    class="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100">
+                                    Détails du contrat
+                                </a>
+
+                                {% if not loc.retour_reelle %}
+                                <!-- Clôture / Retour rapide -->
+                                <form action="{% url 'core:retourner_location' loc.id %}" method="POST" class="block">
+                                    {% csrf_token %}
+                                    <button type="submit"
+                                        class="w-full text-left px-4 py-2 text-xs text-green-600 hover:bg-gray-50 font-medium"
+                                        onclick="return confirm('Confirmer le retour et la restitution des équipements ?')">
+                                        Clôturer / Retour
+                                    </button>
+                                </form>
+
+                                {% if request.user.is_superuser %}
+                                <!-- Modification (Uniquement si non clôturée) -->
+                                <a href="{% url 'core:modifier_location' loc.id %}"
+                                    class="block px-4 py-2 text-xs text-renttech-primary hover:bg-gray-100 font-medium">
+                                    Modifier
+                                </a>
+
+                                <!-- Suppression (Uniquement si non clôturée) -->
+                                <button type="button"
+                                    onclick="document.getElementById('delete_modal_{{ loc.id }}').showModal()"
+                                    class="w-full text-left block px-4 py-2 text-xs text-red-600 hover:bg-red-50 font-medium transition cursor-pointer">
+                                    Supprimer
+                                </button>
+                                {% endif %}
+                                {% endif %}
+                            </div>
+                        </div>
                     </td>
                 </tr>
 
                 <!-- Modale de suppression (Uniquement si admin) -->
                 {% if request.user.is_superuser %}
+                {% if request.user.is_superuser and not loc.retour_reelle %}
                 <dialog id="delete_modal_{{ loc.id }}"
                     class="m-auto p-0 rounded-lg shadow-2xl backdrop:bg-gray-900/50 max-w-md w-full bg-white">
                     <div class="p-6">
@@ -117,7 +135,9 @@
                         </div>
 
                         <p class="text-sm text-gray-600 mb-6">
-                            Êtes-vous sûr de vouloir supprimer la location <span class="font-semibold text-gray-800">#{{loc.id }}</span> ? Cette action remettra les équipements en circulation.
+                            Êtes-vous sûr de vouloir supprimer la location <span
+                                class="font-semibold text-gray-800">#{{loc.id }}</span> ? Cette action remettra les
+                            équipements en circulation.
                         </p>
 
                         <!-- Remplacement de la balise <a> par un <form method="POST"> pour exécuter la suppression -->
@@ -137,7 +157,7 @@
                     </div>
                 </dialog>
                 {% endif %}
-
+                {% endif %}
                 {% endfor %}
                 {% else %}
                 <tr>
@@ -151,4 +171,65 @@
     </div>
 
 </div>
+<script>
+    function toggleDropdown(menuId, event) {
+        event.stopPropagation();
+
+        const button = event.currentTarget;
+        const menu = document.getElementById(menuId);
+
+        // Fermer tous les autres menus ouverts
+        document.querySelectorAll('.action-dropdown').forEach(el => {
+            if (el.id !== menuId) {
+                el.classList.add('hidden');
+            }
+        });
+
+        // Si le menu est actuellement caché, on le calcule et l'affiche en mode "fixed"
+        if (menu.classList.contains('hidden')) {
+            const rect = button.getBoundingClientRect();
+
+            // position: fixed permet de s'échapper totalement du tableau et de ses overflow
+            menu.style.position = 'fixed';
+            menu.style.zIndex = '999999';
+
+            const menuWidth = 192; // Largeur équivalente à w-48 (12rem)
+
+            // Alignement horizontal par rapport au bouton
+            let leftPos = rect.right - menuWidth;
+            if (leftPos < 10) leftPos = 10; // Sécurité bord d'écran gauche
+            menu.style.left = leftPos + 'px';
+
+            // Vérifier l'espace vertical (ouvrir vers le haut si ça dépasse en bas)
+            const windowHeight = window.innerHeight;
+            const menuHeight = menu.offsetHeight || 180; // Hauteur estimée du menu
+
+            if (rect.bottom + menuHeight > windowHeight) {
+                // S'ouvre vers le haut
+                menu.style.top = (rect.top - menuHeight - 4) + 'px';
+            } else {
+                // S'ouvre vers le bas
+                menu.style.top = (rect.bottom + 4) + 'px';
+            }
+
+            menu.classList.remove('hidden');
+        } else {
+            menu.classList.add('hidden');
+        }
+    }
+
+    // Fermer les menus si l'on clique n'importe où ailleurs sur la page
+    window.addEventListener('click', function () {
+        document.querySelectorAll('.action-dropdown').forEach(el => {
+            el.classList.add('hidden');
+        });
+    });
+
+    // Fermer les menus lors du défilement pour éviter qu'ils ne flottent au mauvais endroit
+    window.addEventListener('scroll', function () {
+        document.querySelectorAll('.action-dropdown').forEach(el => {
+            el.classList.add('hidden');
+        });
+    }, true);
+</script>
 {% endblock %}
