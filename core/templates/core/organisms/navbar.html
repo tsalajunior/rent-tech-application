@@ -4,33 +4,45 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16 items-center">
             
-            <!-- Logo -->
-            <div class="flex items-center space-x-3">
-                <a href="{% url 'core:dashboard' %}">
-                    <img class="h-10 rounded-md w-auto" src="{% static 'core/images/RentTech_Logo.jpg' %}"
-                        alt="RentTech_Logo">
-                </a>
-            </div>
+            <!-- Logo & Navigation principale (Desktop) -->
+            <div class="flex items-center space-x-8">
+                <!-- Logo -->
+                <div class="flex items-center">
+                    <a href="{% url 'core:dashboard' %}">
+                        <img class="h-10 rounded-md w-auto" src="{% static 'core/images/RentTech_Logo.jpg' %}"
+                            alt="RentTech_Logo">
+                    </a>
+                </div>
 
-            <!-- 🖥️ Liens de navigation pour bureau (Desktop) -->
-            <div class="hidden md:flex items-center space-x-6">
-                <a href="{% url 'core:dashboard' %}"
-                    class="text-gray-300 hover:text-white text-sm font-medium transition">Tableau de bord</a>
-                <a href="{% url 'core:liste_equipements' %}"
-                    class="text-gray-300 hover:text-white text-sm font-medium transition">Équipements</a>
-                <a href="{% url 'core:liste_clients' %}"
-                    class="text-gray-300 hover:text-white text-sm font-medium transition">Clients</a>
-                <a href="{% url 'core:liste_locations' %}"
-                    class="text-gray-300 hover:text-white text-sm font-medium transition">Locations</a>
-                
-                {% if request.user.is_superuser %}
-                <a href="{% url 'core:liste_utilisateurs' %}"
-                    class="text-gray-300 hover:text-white text-sm font-medium transition">Utilisateurs</a>
-                <a href="{% url 'core:liste_agences' %}"
-                    class="text-gray-300 hover:text-white text-sm font-medium transition">Agences</a>
-                <a href="{% url 'core:liste_categories' %}"
-                    class="text-gray-300 hover:text-white text-sm font-medium transition">Catégories</a>
-                {% endif %}
+                <!-- 🖥️ Liens de navigation pour bureau (Desktop) -->
+                <div class="hidden md:flex items-center space-x-6">
+                    <a href="{% url 'core:dashboard' %}"
+                        class="text-gray-300 hover:text-white text-sm font-medium transition">Tableau de bord</a>
+                    
+                    <!-- Menu déroulant "Menu" -->
+                    <details class="relative inline-block text-left">
+                        <summary class="list-none cursor-pointer inline-flex items-center gap-1 text-gray-300 hover:text-white text-sm font-medium transition select-none py-2">
+                            Menu
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </summary>
+
+                        <!-- Contenu du menu déroulant -->
+                        <div class="absolute left-0 mt-2 z-50 w-48 bg-white border border-gray-200 rounded-md shadow-lg py-1 text-left ring-1 ring-black ring-opacity-5 focus:outline-none">
+                            <a href="{% url 'core:liste_equipements' %}" class="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 font-medium">Équipements</a>
+                            <a href="{% url 'core:liste_clients' %}" class="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 font-medium">Clients</a>
+                            <a href="{% url 'core:liste_locations' %}" class="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 font-medium">Locations</a>
+                            
+                            {% if request.user.is_superuser %}
+                            <div class="border-t border-gray-100 my-1"></div>
+                            <a href="{% url 'core:liste_utilisateurs' %}" class="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 font-medium">Utilisateurs</a>
+                            <a href="{% url 'core:liste_agences' %}" class="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 font-medium">Agences</a>
+                            <a href="{% url 'core:liste_categories' %}" class="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 font-medium">Catégories</a>
+                            {% endif %}
+                        </div>
+                    </details>
+                </div>
             </div>
 
             <!-- À droite (Profil et Déconnexion - Desktop) -->
@@ -50,7 +62,6 @@
             <div class="flex items-center md:hidden">
                 <button id="mobile-menu-button" type="button"
                     class="text-gray-300 hover:text-white focus:outline-none p-2 rounded-md">
-                    <!-- Icône Hamburger (3 lignes) -->
                     <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M4 6h16M4 12h16M4 18h16"></path>
@@ -60,40 +71,44 @@
         </div>
     </div>
 
-    <!-- 📱 Menu déroulant mobile (Masqué par défaut) -->
+    <!-- 📱 Menu mobile (Masqué par défaut) -->
     <div id="mobile-menu"
         class="hidden md:hidden bg-white border-t border-gray-100 px-4 pt-2 pb-4 space-y-1 shadow-lg text-gray-800">
         <a href="{% url 'core:dashboard' %}"
             class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-100 hover:text-renttech-primary">
             Tableau de bord
         </a>
-        <a href="{% url 'core:liste_equipements' %}"
-            class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-100 hover:text-renttech-primary">
-            Équipements
-        </a>
-        <a href="{% url 'core:liste_clients' %}"
-            class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-100 hover:text-renttech-primary">
-            Clients
-        </a>
-        <a href="{% url 'core:liste_locations' %}"
-            class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-100 hover:text-renttech-primary">
-            Locations
-        </a>
+        
+        <div class="border-t border-gray-200 my-1 pt-1">
+            <p class="px-3 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Menu</p>
+            <a href="{% url 'core:liste_equipements' %}"
+                class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-100 hover:text-renttech-primary">
+                Équipements
+            </a>
+            <a href="{% url 'core:liste_clients' %}"
+                class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-100 hover:text-renttech-primary">
+                Clients
+            </a>
+            <a href="{% url 'core:liste_locations' %}"
+                class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-100 hover:text-renttech-primary">
+                Locations
+            </a>
 
-        {% if request.user.is_superuser %}
-        <a href="{% url 'core:liste_utilisateurs' %}"
-            class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-100 hover:text-renttech-primary">
-            Utilisateurs
-        </a>
-        <a href="{% url 'core:liste_agences' %}"
-            class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-100 hover:text-renttech-primary">
-            Agences
-        </a>
-        <a href="{% url 'core:liste_categories' %}"
-            class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-100 hover:text-renttech-primary">
-            Catégories
-        </a>
-        {% endif %}
+            {% if request.user.is_superuser %}
+            <a href="{% url 'core:liste_utilisateurs' %}"
+                class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-100 hover:text-renttech-primary">
+                Utilisateurs
+            </a>
+            <a href="{% url 'core:liste_agences' %}"
+                class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-100 hover:text-renttech-primary">
+                Agences
+            </a>
+            <a href="{% url 'core:liste_categories' %}"
+                class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-100 hover:text-renttech-primary">
+                Catégories
+            </a>
+            {% endif %}
+        </div>
 
         <!-- Section profil / déconnexion pour mobile -->
         <div class="border-t border-gray-200 pt-3 mt-3 space-y-2">
@@ -112,7 +127,7 @@
     </div>
 </nav>
 
-<!-- ⚡ Script JavaScript léger pour basculer l'affichage du menu -->
+<!-- ⚡ Script JavaScript léger pour basculer l'affichage du menu mobile -->
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         const btn = document.getElementById('mobile-menu-button');

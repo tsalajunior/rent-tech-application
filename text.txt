@@ -20,7 +20,7 @@ views - urls - forms - templates
 tsala - wxcvbnwx (paris)
 boska40 - qsdfghjklm (lyon)
 eren98 - mlkjhgfdsq (marseille)
-junior777 - nbvcxwnb (lile)
+junior777 - nbvcxwnb (lille)
 
 ---------------------------------------------------------------------------------------
 
@@ -57,7 +57,10 @@ docker exec -it renttech_web_container python manage.py migrate
 * afficher la date réelle de retour sur la facture lors du retour de l'équipement ✅
 * ajouter le logo, la description et le nom de l'entreprise sur la facture pdf ✅
 * location déjà clôturée ne peut plus être modifiée ni supprimée ✅
+* dropdown menu dans la navbar ✅
+* annuler location
 * statut d'une location (en cours, terminée, étendue) & gestion des retours d'équipements (un
 équipement retourné passe de loué à disponible)
 * étendre la période de location (pénalités)
+* notifications
 * créer le fichier pwa

@@ -79,4 +79,5 @@ urlpatterns = [
         views.retourner_location,
         name="retourner_location",
     ),
+    path('locations/<int:pk>/annuler/', views.annuler_location, name='annuler_location'),
 ]

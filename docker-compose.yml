@@ -9,6 +9,12 @@ services:
       POSTGRES_DB: renttech_db
       POSTGRES_USER: renttech_user
       POSTGRES_PASSWORD: secure_password_123
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
     ports:
       - "5433:5432" # <-- On change le port externe en 5433
     volumes:
@@ -30,7 +36,8 @@ services:
       - POSTGRES_HOST=db # Nom du service conteneur pour Django à l'intérieur du réseau Docker
       - POSTGRES_PORT=5432 # Port interne de PostgreSQL dans le conteneur
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
 volumes:
   postgres_data:

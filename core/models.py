@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
+from datetime import timedelta
 
 
 class Agence(models.Model):
@@ -92,6 +93,13 @@ class Location(models.Model):
     Modèle représentant une location.
     """
 
+    STATUT_CHOICES = [
+        ("en_cours", "En cours"),
+        ("terminee", "Terminée"),
+        ("retard", "En retard"),
+        ("annulee", "Annulée"),
+    ]
+
     client = models.ForeignKey(
         Client, on_delete=models.PROTECT, related_name="locations"
     )
@@ -106,16 +114,14 @@ class Location(models.Model):
         related_name="locations_enregistrees",
     )
 
+    statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='en_cours')
+
     @property
-    def statut(self):
-        aujourd_hui = timezone.now().date()
-        
-        if self.retour_reelle:
-            return "terminee"
-        elif aujourd_hui > self.retour_prevue:
-            return "etendue" 
-        else:
-            return "en_cours"
+    def est_annulable(self):
+        """Vérifie si la location a moins de 24h, n'est pas déjà retournée ni annulée"""
+        if self.retour_reelle or self.statut == "annulee":
+            return False
+        return (timezone.now() - self.date_creation) <= timedelta(hours=24)
 
     date_debut = models.DateField()
     retour_prevue = models.DateField()

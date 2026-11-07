@@ -796,15 +796,15 @@ def liste_locations(request):
         locations = Location.objects.all()
     else:
         try:
-            # 👈 Correction : on utilise 'profil' comme dans le dashboard
             agence_employe = user.profil.agence
             locations = Location.objects.filter(agence=agence_employe)
         except AttributeError:
             locations = Location.objects.none()
 
-    locations = locations.select_related(
-        "client", "agence", "employe"
-    ).prefetch_related("lignes_location__equipement")
+    # locations = locations.select_related(
+    #     "client", "agence", "employe"
+    # ).prefetch_related("lignes_location__equipement")
+    locations = locations.order_by('-date_creation')
 
     return render(request, "core/pages/liste_locations.html", {"locations": locations})
 
@@ -1090,6 +1090,56 @@ def modifier_location(request, pk):
         },
     )
 
+
+@login_required
+@never_cache
+def annuler_location(request, pk):
+    location = get_object_or_404(Location, pk=pk)
+    user = request.user
+
+    # Sécurité agence
+    if not user.is_superuser:
+        try:
+            if location.agence != user.profil.agence:
+                messages.error(request, "Accès non autorisé.")
+                return redirect("core:liste_locations")
+        except AttributeError:
+            return redirect("core:liste_locations")
+
+    # Vérification des règles métiers
+    if not location.est_annulable:
+        messages.error(
+            request, 
+            "Impossible d'annuler cette location : le délai de 24 heures est dépassé ou le contrat est déjà clôturé/annulé."
+        )
+        return redirect("core:liste_locations")
+
+    try:
+        with transaction.atomic():
+            # 1. Libérer les équipements associés (remise en stock)
+            lignes = location.lignes_location.all()
+            equipements_ids = [ligne.equipement_id for ligne in lignes]
+            Equipement.objects.filter(id__in=equipements_ids).update(statut="disponible")
+
+            # 2. Mettre à jour le statut de la location
+            location.statut = 'annulee'
+            location.save()
+
+            # 3. Calculs des montants remboursés (90% du total de la location + 100% de la caution)
+            montant_loc_rembourse = round(float(location.montant_total) * 0.90, 2)
+            montant_caution_rembourse = float(location.caution)
+
+            messages.success(
+                request,
+                f"La location #{location.id} a été annulée avec succès. "
+                f"À rembourser au client : {montant_loc_rembourse} € (90% de la location) + {montant_caution_rembourse} € (caution intégrale)."
+            )
+            return redirect("core:liste_locations")
+
+    except Exception as e:
+        messages.error(request, f"Erreur lors de l'annulation : {e}")
+        return redirect("core:liste_locations")
+    
 
 @login_required
 @never_cache
