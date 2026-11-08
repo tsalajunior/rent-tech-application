@@ -1,0 +1,49 @@
+reference,nom,prix_journalier,statut,categorie,agence
+LAP-0001-PR,Lenovo ThinkPad E14 Gen 5,5.50,disponible,Ordinateurs Portables,Agence de Paris
+LAP-0002-PR,HP ProBook 450 G10,6.50,disponible,Ordinateurs Portables,Agence de Paris
+LAP-0003-PR,Dell Latitude 5450,8.00,disponible,Ordinateurs Portables,Agence de Paris
+LAP-0004-PR,ASUS VivoBook 15,9.50,disponible,Ordinateurs Portables,Agence de Paris
+DE-0001-PR,Dell OptiPlex 7020,6.00,disponible,Ordinateurs de Bureau,Agence de Paris
+DE-0002-PR,HP ProDesk 400 G9,8.00,disponible,Ordinateurs de Bureau,Agence de Paris
+DE-0003-PR,Lenovo ThinkCentre neo 50s,10.00,disponible,Ordinateurs de Bureau,Agence de Paris
+DE-0004-PR,ASUS ExpertCenter D5,12.00,disponible,Ordinateurs de Bureau,Agence de Paris
+VID-0001-PR,Epson EB-E20,7.50,disponible,Vidéoprojecteurs,Agence de Paris
+VID-0002-PR,BenQ MS560,9.20,disponible,Vidéoprojecteurs,Agence de Paris
+VID-0003-PR,ViewSonic PA503S,10.80,disponible,Vidéoprojecteurs,Agence de Paris
+VID-0004-PR,Epson CO-W01,12.60,disponible,Vidéoprojecteurs,Agence de Paris
+LAP-0001-MR,Lenovo ThinkPad E14 Gen 5,5.50,disponible,Ordinateurs Portables,Agence de Marseille
+LAP-0002-MR,HP ProBook 450 G10,6.50,disponible,Ordinateurs Portables,Agence de Marseille
+LAP-0003-MR,Dell Latitude 5450,8.00,disponible,Ordinateurs Portables,Agence de Marseille
+LAP-0004-MR,ASUS VivoBook 15,9.50,disponible,Ordinateurs Portables,Agence de Marseille
+DE-0001-MR,Dell OptiPlex 7020,6.00,disponible,Ordinateurs de Bureau,Agence de Marseille
+DE-0002-MR,HP ProDesk 400 G9,8.00,disponible,Ordinateurs de Bureau,Agence de Marseille
+DE-0003-MR,Lenovo ThinkCentre neo 50s,10.00,disponible,Ordinateurs de Bureau,Agence de Marseille
+DE-0004-MR,ASUS ExpertCenter D5,12.00,disponible,Ordinateurs de Bureau,Agence de Marseille
+VID-0001-MR,Epson EB-E20,7.50,disponible,Vidéoprojecteurs,Agence de Marseille
+VID-0002-MR,BenQ MS560,9.20,disponible,Vidéoprojecteurs,Agence de Marseille
+VID-0003-MR,ViewSonic PA503S,10.80,disponible,Vidéoprojecteurs,Agence de Marseille
+VID-0004-MR,Epson CO-W01,12.60,disponible,Vidéoprojecteurs,Agence de Marseille
+LAP-0001-LYO,Lenovo ThinkPad E14 Gen 5,5.50,disponible,Ordinateurs Portables,Agence de Lyon
+LAP-0002-LYO,HP ProBook 450 G10,6.50,disponible,Ordinateurs Portables,Agence de Lyon
+LAP-0003-LYO,Dell Latitude 5450,8.00,disponible,Ordinateurs Portables,Agence de Lyon
+LAP-0004-LYO,ASUS VivoBook 15,9.50,disponible,Ordinateurs Portables,Agence de Lyon
+DE-0001-LYO,Dell OptiPlex 7020,6.00,disponible,Ordinateurs de Bureau,Agence de Lyon
+DE-0002-LYO,HP ProDesk 400 G9,8.00,disponible,Ordinateurs de Bureau,Agence de Lyon
+DE-0003-LYO,Lenovo ThinkCentre neo 50s,10.00,disponible,Ordinateurs de Bureau,Agence de Lyon
+DE-0004-LYO,ASUS ExpertCenter D5,12.00,disponible,Ordinateurs de Bureau,Agence de Lyon
+VID-0001-LYO,Epson EB-E20,7.50,disponible,Vidéoprojecteurs,Agence de Lyon
+VID-0002-LYO,BenQ MS560,9.20,disponible,Vidéoprojecteurs,Agence de Lyon
+VID-0003-LYO,ViewSonic PA503S,10.80,disponible,Vidéoprojecteurs,Agence de Lyon
+VID-0004-LYO,Epson CO-W01,12.60,disponible,Vidéoprojecteurs,Agence de Lyon
+LAP-0001-LIL,Lenovo ThinkPad E14 Gen 5,5.50,disponible,Ordinateurs Portables,Agence de Lille
+LAP-0002-LIL,HP ProBook 450 G10,6.50,disponible,Ordinateurs Portables,Agence de Lille
+LAP-0003-LIL,Dell Latitude 5450,8.00,disponible,Ordinateurs Portables,Agence de Lille
+LAP-0004-LIL,ASUS VivoBook 15,9.50,disponible,Ordinateurs Portables,Agence de Lille
+DE-0001-LIL,Dell OptiPlex 7020,6.00,disponible,Ordinateurs de Bureau,Agence de Lille
+DE-0002-LIL,HP ProDesk 400 G9,8.00,disponible,Ordinateurs de Bureau,Agence de Lille
+DE-0003-LIL,Lenovo ThinkCentre neo 50s,10.00,disponible,Ordinateurs de Bureau,Agence de Lille
+DE-0004-LIL,ASUS ExpertCenter D5,12.00,disponible,Ordinateurs de Bureau,Agence de Lille
+VID-0001-LIL,Epson EB-E20,7.50,disponible,Vidéoprojecteurs,Agence de Lille
+VID-0002-LIL,BenQ MS560,9.20,disponible,Vidéoprojecteurs,Agence de Lille
+VID-0003-LIL,ViewSonic PA503S,10.80,disponible,Vidéoprojecteurs,Agence de Lille
+VID-0004-LIL,Epson CO-W01,12.60,disponible,Vidéoprojecteurs,Agence de Lille

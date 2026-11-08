@@ -12,7 +12,7 @@ PostgreSQL (version Alpine pour être léger sur le disque).
 
 ---------------------------------------------------------------------------------------
 
-superadmin : stephane - stephane
+superadmin : stephane - admin@12345
 views - urls - forms - templates
 
 ---------------------------------------------------------------------------------------
@@ -63,4 +63,9 @@ docker exec -it renttech_web_container python manage.py migrate
 équipement retourné passe de loué à disponible)
 * étendre la période de location (pénalités)
 * notifications
+* états financiers des locations (classement par période et par agence), chiffre d'affaire, 
+générer rapport financiers
+* afficher les statistiques de locations (classement par période et par agence), locations annulées,
+locations étendues, locations terminées, meilleurs clients 
+* générer fichier .csv (équipements, clients, locations)
 * créer le fichier pwa
