@@ -1,6 +1,7 @@
 import csv
 from io import StringIO
 
+from django.core.management import call_command
 from django.template.loader import get_template
 from django.test import RequestFactory, SimpleTestCase, TestCase
 from django.urls import resolve, reverse
@@ -21,6 +22,7 @@ from .models import (
     Equipement,
     Location,
     LocationEquipement,
+    Notification,
     ProlongationLocation,
     ProfilEmploye,
 )
@@ -238,6 +240,8 @@ class LocationReturnTests(SimpleTestCase):
         returned_on = date(2026, 11, 7)
         location = SimpleNamespace(
             id=12,
+            pk=12,
+            client="Client test",
             retour_reelle=None,
             statut="en_cours",
             lignes_location=SimpleNamespace(values_list=Mock(return_value=[])),
@@ -254,6 +258,7 @@ class LocationReturnTests(SimpleTestCase):
             patch("core.views.timezone.localdate", return_value=returned_on),
             patch("core.views.messages.success"),
             patch("core.views.transaction.atomic"),
+            patch("core.views.notify_location_event"),
         ):
             retourner_location.__wrapped__(request, 12)
 
@@ -1001,3 +1006,263 @@ class CsvExportTests(TestCase):
             reverse("core:exporter_utilisateurs_csv")
         )
         self.assertEqual(denied_users_export.status_code, 302)
+
+
+class NotificationTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            username="admin", email="admin@example.test", password="test-password"
+        )
+        self.agence = Agence.objects.create(
+            nom="Agence test", ville="Paris", adresse="1 rue test"
+        )
+        self.autre_agence = Agence.objects.create(
+            nom="Agence Lyon", ville="Lyon", adresse="2 rue test"
+        )
+        self.employee = User.objects.create_user(
+            username="employee", password="test-password"
+        )
+        ProfilEmploye.objects.create(user=self.employee, agence=self.agence)
+        self.other_employee = User.objects.create_user(
+            username="other_employee", password="test-password"
+        )
+        ProfilEmploye.objects.create(
+            user=self.other_employee, agence=self.autre_agence
+        )
+        self.categorie = Categorie.objects.create(nom="Informatique")
+        self.client_record = Client.objects.create(
+            nom="Martin",
+            prenom="Alice",
+            email="alice@example.test",
+            telephone="0102030405",
+            agence=self.agence,
+        )
+        self.equipement = Equipement.objects.create(
+            reference="REF-1",
+            nom="Ordinateur",
+            prix_journalier=Decimal("10.00"),
+            categorie=self.categorie,
+            agence=self.agence,
+        )
+        self.today = date(2026, 11, 9)
+
+    def creer_location(self, retour_prevue, statut="en_cours"):
+        return Location.objects.create(
+            client=self.client_record,
+            agence=self.agence,
+            employe=self.employee,
+            statut=statut,
+            date_debut=self.today,
+            retour_prevue=retour_prevue,
+            caution=Decimal("15.00"),
+            montant_total=Decimal("30.00"),
+        )
+
+    def test_employee_location_event_notifies_admins_but_not_agency_users(self):
+        from .notifications import notify_location_event
+
+        location = self.creer_location(self.today + timedelta(days=2))
+        notify_location_event(
+            location,
+            self.employee,
+            "location_created",
+            "Nouvelle location",
+            "Une location a été créée.",
+        )
+
+        notifications = Notification.objects.all()
+        self.assertEqual(notifications.count(), 1)
+        self.assertSetEqual(
+            set(notifications.values_list("recipient_id", flat=True)),
+            {self.admin.pk},
+        )
+        admin_notification = notifications.get(recipient=self.admin)
+        self.assertEqual(admin_notification.actor, self.employee)
+        self.assertEqual(admin_notification.agence, self.agence)
+        self.assertIn("employee", admin_notification.message)
+        self.assertEqual(
+            admin_notification.target_url,
+            reverse("core:detail_location", args=[location.pk]),
+        )
+
+    def test_notification_icon_page_read_action_and_recipient_isolation(self):
+        notification = Notification.objects.create(
+            recipient=self.employee,
+            actor=self.admin,
+            agence=self.agence,
+            event_type="equipment_created",
+            title="Nouvel équipement",
+            message="Équipement ajouté au stock.",
+            target_url=reverse("core:liste_equipements"),
+            event_key="equipment:1",
+        )
+        self.client.force_login(self.employee)
+
+        page = self.client.get(reverse("core:liste_notifications"))
+        self.assertContains(page, "Nouvel équipement")
+        self.assertContains(page, "admin")
+        self.assertContains(page, "Agence test")
+        self.assertContains(
+            page,
+            reverse("core:ouvrir_notification", args=[notification.pk]),
+        )
+        self.assertContains(page, 'aria-label="Notifications"')
+        self.assertEqual(page.context["unread_notifications_count"], 1)
+
+        response = self.client.post(
+            reverse("core:ouvrir_notification", args=[notification.pk])
+        )
+        notification.refresh_from_db()
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], reverse("core:liste_equipements"))
+        self.assertIsNotNone(notification.read_at)
+
+        self.client.force_login(self.other_employee)
+        forbidden = self.client.post(
+            reverse("core:ouvrir_notification", args=[notification.pk])
+        )
+        self.assertEqual(forbidden.status_code, 404)
+
+    def test_daily_reminders_are_scoped_and_idempotent(self):
+        tomorrow = self.creer_location(self.today + timedelta(days=1))
+        due_today = self.creer_location(self.today)
+        overdue = self.creer_location(self.today - timedelta(days=1))
+        self.creer_location(self.today + timedelta(days=5))
+        self.creer_location(
+            self.today - timedelta(days=1),
+            statut="terminee",
+        )
+        with patch(
+            "core.management.commands.envoyer_rappels_echeance.timezone.localdate",
+            return_value=self.today,
+        ):
+            call_command("envoyer_rappels_echeance", stdout=StringIO())
+            call_command("envoyer_rappels_echeance", stdout=StringIO())
+
+        notifications = Notification.objects.order_by("event_type", "recipient_id")
+        self.assertEqual(notifications.count(), 6)
+        self.assertEqual(
+            set(notifications.values_list("recipient_id", flat=True)),
+            {self.admin.pk, self.employee.pk},
+        )
+        self.assertEqual(
+            set(notifications.values_list("event_type", flat=True)),
+            {"rental_due_tomorrow", "rental_due_today", "rental_overdue"},
+        )
+        self.assertTrue(
+            notifications.filter(
+                title="Location en retard",
+                message__contains=f"#{overdue.pk}",
+            ).exists()
+        )
+        self.assertTrue(
+            notifications.filter(message__contains=f"#{tomorrow.pk}").exists()
+        )
+        self.assertTrue(
+            notifications.filter(message__contains=f"#{due_today.pk}").exists()
+        )
+
+    def test_new_equipment_assignment_notifies_the_agency(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("core:equipement_ajouter"),
+            {
+                "reference": "REF-NEW",
+                "nom": "Nouveau matériel",
+                "prix_journalier": "20.00",
+                "statut": "disponible",
+                "categorie": self.categorie.pk,
+                "agence": self.agence.pk,
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        notification = Notification.objects.get(recipient=self.employee)
+        self.assertEqual(notification.event_type, "equipment_created")
+        self.assertEqual(notification.agence, self.agence)
+        self.assertIn("REF-NEW", notification.message)
+        self.assertFalse(
+            Notification.objects.filter(recipient=self.other_employee).exists()
+        )
+
+    def test_equipment_maintenance_change_notifies_its_agency(self):
+        from .notifications import notify_equipment_event
+
+        self.client.force_login(self.admin)
+        with patch(
+            "core.views.notify_equipment_event",
+            wraps=notify_equipment_event,
+        ) as notify:
+            response = self.client.post(
+                reverse("core:equipement_modifier", args=[self.equipement.pk]),
+                {
+                    "reference": self.equipement.reference,
+                    "nom": self.equipement.nom,
+                    "prix_journalier": "10.00",
+                    "statut": "maintenance",
+                    "categorie": self.categorie.pk,
+                    "agence": self.agence.pk,
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.equipement.refresh_from_db()
+        self.assertEqual(self.equipement.statut, "maintenance")
+        self.assertTrue(notify.called)
+        notification = Notification.objects.get(recipient=self.employee)
+        self.assertEqual(notification.event_type, "equipment_updated")
+        self.assertIn("maintenance", notification.message)
+        self.assertFalse(
+            Notification.objects.filter(recipient=self.other_employee).exists()
+        )
+
+    def test_employee_location_creation_notifies_admin_only(self):
+        self.client.force_login(self.employee)
+        response = self.client.post(
+            reverse("core:creer_location"),
+            {
+                "client": self.client_record.pk,
+                "agence": self.agence.pk,
+                "date_debut": self.today.isoformat(),
+                "retour_prevue": (self.today + timedelta(days=2)).isoformat(),
+                "caution": "15.00",
+                "equipements": [self.equipement.pk],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        notifications = Notification.objects.filter(event_type="location_created")
+        self.assertSetEqual(
+            set(notifications.values_list("recipient_id", flat=True)),
+            {self.admin.pk},
+        )
+        self.assertEqual(notifications.first().agence, self.agence)
+        self.assertFalse(
+            Notification.objects.filter(recipient=self.employee).exists()
+        )
+        self.assertFalse(
+            Notification.objects.filter(recipient=self.other_employee).exists()
+        )
+
+    def test_admin_action_notifies_only_target_agency_employees_and_other_admins(self):
+        from .notifications import notify_location_event
+
+        location = self.creer_location(self.today + timedelta(days=2))
+        notify_location_event(
+            location,
+            self.admin,
+            "location_cancelled",
+            "Location annulée",
+            "Annulation réalisée par l’administration.",
+        )
+
+        self.assertSetEqual(
+            set(Notification.objects.values_list("recipient_id", flat=True)),
+            {self.employee.pk},
+        )
+        self.assertFalse(
+            Notification.objects.filter(recipient=self.admin).exists()
+        )
+        self.assertFalse(
+            Notification.objects.filter(recipient=self.other_employee).exists()
+        )

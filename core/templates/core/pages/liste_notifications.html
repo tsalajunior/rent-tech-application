@@ -1,0 +1,77 @@
+{% extends 'core/templates/base.html' %}
+
+{% block title %}RentTech - Notifications{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto bg-white shadow rounded-lg border border-gray-100 mt-6 mb-12">
+    <div class="p-6 border-b border-gray-100 flex flex-wrap items-center justify-between gap-4">
+        <div>
+            <h1 class="text-xl font-bold text-renttech-dark">Notifications</h1>
+            <p class="text-sm text-gray-500">Historique des actions et rappels de vos agences.</p>
+        </div>
+        {% if unread_notifications_count %}
+        <form method="post" action="{% url 'core:marquer_notifications_lues' %}">
+            {% csrf_token %}
+            <button type="submit"
+                class="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-md text-sm font-medium">
+                Tout marquer comme lu
+            </button>
+        </form>
+        {% endif %}
+    </div>
+
+    <div class="divide-y divide-gray-100">
+        {% for notification in page_obj %}
+        <article class="p-5 flex gap-4 {% if not notification.read_at %}bg-blue-50/60{% endif %}">
+            <span class="mt-1 h-2.5 w-2.5 rounded-full flex-shrink-0 {% if not notification.read_at %}bg-blue-600{% else %}bg-gray-300{% endif %}"
+                aria-label="{% if not notification.read_at %}Non lu{% else %}Lu{% endif %}"></span>
+            <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap justify-between gap-x-4 gap-y-1">
+                    <h2 class="font-semibold text-gray-900">{{ notification.title }}</h2>
+                    <time class="text-xs text-gray-500"
+                        datetime="{{ notification.created_at|date:'c' }}">
+                        {{ notification.created_at|date:"d/m/Y à H:i" }}
+                    </time>
+                </div>
+                <p class="mt-1 text-sm text-gray-700">{{ notification.message }}</p>
+                <p class="mt-2 text-xs text-gray-500">
+                    Agence : {{ notification.agence.nom|default:"Administration centrale" }}
+                    · Action par :
+                    {% if notification.actor %}
+                    {{ notification.actor.get_full_name|default:notification.actor.username }}
+                    {% else %}
+                    Système
+                    {% endif %}
+                </p>
+                {% if notification.target_url %}
+                <form method="post" action="{% url 'core:ouvrir_notification' notification.pk %}" class="mt-3">
+                    {% csrf_token %}
+                    <button type="submit" class="text-sm text-renttech-primary hover:underline font-medium">
+                        Ouvrir
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </article>
+        {% empty %}
+        <p class="p-10 text-center text-sm text-gray-500">Aucune notification pour le moment.</p>
+        {% endfor %}
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <nav class="p-5 border-t border-gray-100 flex items-center justify-between text-sm" aria-label="Pagination">
+        {% if page_obj.has_previous %}
+        <a class="text-renttech-primary hover:underline" href="?page={{ page_obj.previous_page_number }}">Précédent</a>
+        {% else %}
+        <span class="text-gray-400">Précédent</span>
+        {% endif %}
+        <span class="text-gray-500">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+        <a class="text-renttech-primary hover:underline" href="?page={{ page_obj.next_page_number }}">Suivant</a>
+        {% else %}
+        <span class="text-gray-400">Suivant</span>
+        {% endif %}
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

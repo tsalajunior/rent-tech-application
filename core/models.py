@@ -231,6 +231,45 @@ class ProlongationLocation(models.Model):
         return f"Prolongation de la location #{self.location_id}"
 
 
+class Notification(models.Model):
+    recipient = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="notifications"
+    )
+    actor = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notifications_effectuees",
+    )
+    agence = models.ForeignKey(
+        Agence,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notifications",
+    )
+    event_type = models.CharField(max_length=40)
+    title = models.CharField(max_length=180)
+    message = models.TextField()
+    target_url = models.CharField(max_length=255, blank=True)
+    event_key = models.CharField(max_length=150)
+    created_at = models.DateTimeField(auto_now_add=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-created_at", "-pk")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("recipient", "event_key"),
+                name="unique_notification_per_recipient_event",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.title} — {self.recipient.username}"
+
+
 class ProfilEmploye(models.Model):
     """
     Modèle représentant le profil d'un employé.

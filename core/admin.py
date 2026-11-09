@@ -1,7 +1,16 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
-from .models import Agence, Categorie, Equipement, Client, Location, LocationEquipement, ProfilEmploye
+from .models import (
+    Agence,
+    Categorie,
+    Client,
+    Equipement,
+    Location,
+    LocationEquipement,
+    Notification,
+    ProfilEmploye,
+)
 
 
 @admin.register(Agence)
@@ -78,3 +87,11 @@ class CustomUserAdmin(UserAdmin):
 # On désenregistre l'User par défaut pour réenregistrer notre version enrichie
 admin.site.unregister(User)
 admin.site.register(User, CustomUserAdmin)
+
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ("title", "recipient", "agence", "event_type", "created_at", "read_at")
+    list_filter = ("event_type", "agence", "created_at", "read_at")
+    search_fields = ("title", "message", "recipient__username", "actor__username")
+    readonly_fields = ("created_at",)

@@ -39,5 +39,22 @@ services:
       db:
         condition: service_healthy
 
+  scheduler:
+    build: .
+    container_name: renttech_scheduler_container
+    restart: always
+    command: python manage.py envoyer_rappels_echeance --loop
+    volumes:
+      - .:/app
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   postgres_data:

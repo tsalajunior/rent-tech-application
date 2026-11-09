@@ -63,7 +63,7 @@ docker exec -it renttech_web_container python manage.py migrate
 équipement retourné passe de loué à disponible) ✅
 * étendre la période de location (pénalités) ✅
 * générer fichier .csv (équipements, clients, locations, utilisateurs) ✅ 
-* notifications
+* notifications ✅
 * états financiers des locations (classement par période et par agence), chiffre d'affaire, 
 générer rapport financiers
 * afficher les statistiques de locations (classement par période et par agence), locations annulées,

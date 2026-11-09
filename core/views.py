@@ -21,7 +21,13 @@ from .models import (
     Location,
     LocationEquipement,
     ProlongationLocation,
+    Notification,
     ProfilEmploye,
+)
+from .notifications import (
+    notify_equipment_event,
+    notify_location_event,
+    notify_event,
 )
 from django.views.decorators.cache import never_cache
 from django.core.paginator import Paginator
@@ -133,6 +139,45 @@ def _montants_location_csv(location, aujourd_hui):
         montant_final = location.montant_total + penalite
 
     return _arrondir_montant(remboursement), _arrondir_montant(montant_final)
+
+
+@login_required
+@never_cache
+def liste_notifications(request):
+    notifications = Notification.objects.filter(
+        recipient=request.user
+    ).select_related("actor", "agence")
+    page_obj = Paginator(notifications, 25).get_page(request.GET.get("page"))
+    return render(
+        request,
+        "core/pages/liste_notifications.html",
+        {"page_obj": page_obj},
+    )
+
+
+@login_required
+@never_cache
+def ouvrir_notification(request, pk):
+    if request.method != "POST":
+        return redirect("core:liste_notifications")
+    notification = get_object_or_404(
+        Notification, pk=pk, recipient=request.user
+    )
+    if notification.read_at is None:
+        notification.read_at = timezone.now()
+        notification.save(update_fields=["read_at"])
+    return redirect(notification.target_url or "core:liste_notifications")
+
+
+@login_required
+@never_cache
+def marquer_notifications_lues(request):
+    if request.method != "POST":
+        return redirect("core:liste_notifications")
+    Notification.objects.filter(
+        recipient=request.user, read_at__isnull=True
+    ).update(read_at=timezone.now())
+    return redirect("core:liste_notifications")
 
 
 # dashboard dynamique pour l'administrateur central et les employés
@@ -322,7 +367,18 @@ def equipement_ajouter(request):
                     "Un équipement ne peut passer à l'état loué que lorsqu'il est associé à une location.",
                 )
             else:
-                form.save()
+                equipement = form.save()
+                notify_equipment_event(
+                    equipment=equipement,
+                    actor=request.user,
+                    title="Nouvel équipement affecté à votre agence",
+                    message=(
+                        f"L’équipement {equipement.reference} — {equipement.nom} "
+                        f"a été ajouté au stock avec le statut "
+                        f"{equipement.get_statut_display()}."
+                    ),
+                    event_type="equipment_created",
+                )
                 return redirect("core:liste_equipements")
     else:
         form = EquipementForm()
@@ -357,7 +413,19 @@ def equipement_supprimer(request, pk):
                     "Cet équipement est associé à une location active et ne peut pas être supprimé.",
                 )
                 return redirect("core:liste_equipements")
+            ancienne_agence = equipement.agence
             equipement.delete()
+            notify_event(
+                actor=request.user,
+                agency=ancienne_agence,
+                event_type="equipment_deleted",
+                title="Équipement retiré du stock",
+                message=(
+                    f"L’équipement {equipement.reference} — {equipement.nom} "
+                    f"a été supprimé du parc de l’agence."
+                ),
+                target_url=reverse("core:liste_equipements"),
+            )
         return redirect("core:liste_equipements")
 
     equipement = get_object_or_404(Equipement, pk=pk)
@@ -403,6 +471,8 @@ def equipement_modifier(request, pk):
                 )
                 return redirect("core:liste_equipements")
 
+            ancienne_agence = equipement.agence
+            ancien_statut = equipement.statut
             form = EquipementForm(request.POST, instance=equipement)
             if form.is_valid():
                 if form.cleaned_data["statut"] == "loue":
@@ -411,7 +481,44 @@ def equipement_modifier(request, pk):
                         "Un équipement ne peut être marqué loué que lorsqu'il est associé à une location active.",
                     )
                 else:
-                    form.save()
+                    equipement = form.save()
+                    if (
+                        ancienne_agence.pk != equipement.agence_id
+                        or ancien_statut != equipement.statut
+                    ):
+                        changements = []
+                        if ancienne_agence.pk != equipement.agence_id:
+                            changements.append(
+                                f"affecté à l’agence {equipement.agence.nom}"
+                            )
+                        if ancien_statut != equipement.statut:
+                            changements.append(
+                                f"statut : {equipement.get_statut_display()}"
+                            )
+                        notify_equipment_event(
+                            equipment=equipement,
+                            actor=request.user,
+                            title="Mise à jour du parc de votre agence",
+                            message=(
+                                f"L’équipement {equipement.reference} — "
+                                f"{equipement.nom} a été mis à jour "
+                                f"({', '.join(changements)})."
+                            ),
+                            event_type="equipment_updated",
+                        )
+                        if ancienne_agence.pk != equipement.agence_id:
+                            notify_event(
+                                actor=request.user,
+                                agency=ancienne_agence,
+                                event_type="equipment_reassigned",
+                                title="Équipement réaffecté à une autre agence",
+                                message=(
+                                    f"L’équipement {equipement.reference} — "
+                                    f"{equipement.nom} a été transféré vers "
+                                    f"l’agence {equipement.agence.nom}."
+                                ),
+                                target_url=reverse("core:liste_equipements"),
+                            )
                     return redirect("core:liste_equipements")
     else:
         equipement = get_object_or_404(Equipement, pk=pk)
@@ -1024,6 +1131,17 @@ def creer_location(request):
                             pk__in=equipements_ids
                         ).update(statut="loue")
 
+                        notify_location_event(
+                            location,
+                            user,
+                            "location_created",
+                            "Nouvelle location enregistrée",
+                            (
+                                f"La location #{location.pk} pour "
+                                f"{location.client} a été créée. "
+                                f"Retour prévu le {location.retour_prevue:%d/%m/%Y}."
+                            ),
+                        )
                         messages.success(
                             request, f"La location #{location.id} a été créée avec succès."
                         )
@@ -1452,6 +1570,17 @@ def modifier_location(request, pk):
                         pk__in=equipements_ids
                     ).update(statut="loue")
 
+                    notify_location_event(
+                        loc_modifiee,
+                        user,
+                        "location_updated",
+                        "Location modifiée",
+                        (
+                            f"La location #{loc_modifiee.pk} de "
+                            f"{loc_modifiee.client} a été modifiée. "
+                            f"Retour prévu le {loc_modifiee.retour_prevue:%d/%m/%Y}."
+                        ),
+                    )
                     messages.success(
                         request,
                         f"La location #{location.id} a été modifiée avec succès.",
@@ -1535,6 +1664,17 @@ def annuler_location(request, pk):
                 ).update(statut="disponible")
         location.statut = "annulee"
         location.save(update_fields=["statut"])
+        notify_location_event(
+            location,
+            user,
+            "location_cancelled",
+            "Location annulée",
+            (
+                f"La location #{location.pk} de {location.client} a été annulée. "
+                f"Remboursement total à effectuer : "
+                f"{location.montant_total_a_rembourser} €."
+            ),
+        )
         messages.success(
             request,
             f"La location #{location.id} a été annulée. Remboursement à effectuer : "
@@ -1582,6 +1722,18 @@ def supprimer_location(request, pk):
             pk__in=equipements_ids, statut="loue"
         ).exclude(pk__in=equipements_loues_ailleurs).update(
             statut="disponible"
+        )
+        notification_location = location
+        notify_location_event(
+            notification_location,
+            request.user,
+            "location_deleted",
+            "Location supprimée",
+            (
+                f"La location #{notification_location.pk} de "
+                f"{notification_location.client} a été supprimée."
+            ),
+            target_url=reverse("core:liste_locations"),
         )
         location.delete()
         messages.success(
@@ -1641,6 +1793,17 @@ def retourner_location(request, pk):
                     pk=equipement_id, statut="loue"
                 ).update(statut="disponible")
 
+        notify_location_event(
+            location,
+            request.user,
+            "location_returned",
+            "Location clôturée",
+            (
+                f"Le retour de la location #{location.pk} de {location.client} "
+                f"a été enregistré le {location.retour_reelle:%d/%m/%Y}. "
+                f"Pénalités enregistrées : {location.penalite_retard} €."
+            ),
+        )
         messages.success(
             request,
             f"La location #{location.id} est clôturée. Les équipements disponibles ont été libérés. "
@@ -1734,6 +1897,17 @@ def etendre_location(request, pk):
             nouvelle_date=nouvelle_date,
             montant_supplementaire=montant_supplementaire,
             employe=request.user,
+        )
+        notify_location_event(
+            location,
+            request.user,
+            "location_extended",
+            "Location prolongée",
+            (
+                f"La location #{location.pk} de {location.client} a été prolongée "
+                f"jusqu’au {location.retour_prevue:%d/%m/%Y}. "
+                f"Supplément : {montant_supplementaire} €."
+            ),
         )
         messages.success(
             request,
