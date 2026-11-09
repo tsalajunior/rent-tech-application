@@ -1,8 +1,6 @@
 from django import forms
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from datetime import date
-
 from django.utils import timezone
 from .models import Agence, Equipement, Client, ProfilEmploye, Categorie, Location
 
@@ -258,10 +256,20 @@ class LocationForm(forms.ModelForm):
         user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
 
-        # 1. Empêcher de sélectionner une date antérieure à aujourd'hui directement dans le calendrier HTML5
-        today_str = date.today().isoformat()
-        self.fields["date_debut"].widget.attrs["min"] = today_str
-        self.fields["retour_prevue"].widget.attrs["min"] = today_str
+        # Preserve existing past dates when editing while blocking new past dates.
+        today = timezone.localdate()
+        date_debut_min = (
+            self.instance.date_debut.isoformat()
+            if self.instance.pk
+            else today.isoformat()
+        )
+        retour_prevue_min = (
+            min(today, self.instance.retour_prevue).isoformat()
+            if self.instance.pk
+            else today.isoformat()
+        )
+        self.fields["date_debut"].widget.attrs["min"] = date_debut_min
+        self.fields["retour_prevue"].widget.attrs["min"] = retour_prevue_min
 
         # Si l'utilisateur n'est pas superuser, on restreint l'agence à la sienne
         if user and not user.is_superuser:
@@ -295,7 +303,9 @@ class LocationForm(forms.ModelForm):
     # 3. Validation de sécurité côté serveur (Empêche le contournement)
     def clean_date_debut(self):
         date_debut = self.cleaned_data.get("date_debut")
-        if date_debut and date_debut < date.today():
+        if date_debut and date_debut < timezone.localdate() and (
+            not self.instance.pk or date_debut != self.instance.date_debut
+        ):
             raise ValidationError(
                 "La date de début de location ne peut pas être antérieure à aujourd'hui."
             )
@@ -303,14 +313,13 @@ class LocationForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        agence = cleaned_data.get("agence")
+        client = cleaned_data.get("client")
         date_debut = cleaned_data.get("date_debut")
         retour_prevue = cleaned_data.get("retour_prevue")
 
-        # La règle de la date passée s'applique UNIQUEMENT à la création (pas en modification)
-        if not self.instance.pk and date_debut and date_debut < timezone.now().date():
-            self.add_error(
-                "date_debut", "La date de début ne peut pas être dans le passé."
-            )
+        if agence and client and client.agence_id != agence.id:
+            self.add_error("client", "Le client doit appartenir à l'agence choisie.")
 
         if date_debut and retour_prevue and retour_prevue <= date_debut:
             self.add_error(
@@ -319,3 +328,15 @@ class LocationForm(forms.ModelForm):
             )
 
         return cleaned_data
+
+
+class ProlongationLocationForm(forms.Form):
+    nouvelle_date = forms.DateField(
+        input_formats=["%Y-%m-%d"],
+        widget=forms.DateInput(
+            attrs={
+                "type": "date",
+                "class": "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-renttech-primary",
+            }
+        ),
+    )

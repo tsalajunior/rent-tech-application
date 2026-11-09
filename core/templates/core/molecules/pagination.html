@@ -1,13 +1,13 @@
-{% if equipements.has_other_pages %}
+{% if page_obj.has_other_pages %}
 <div class="flex items-center justify-between border-t border-gray-200 bg-white px-6 py-3 rounded-b-lg">
     <!-- Version mobile -->
     <div class="flex flex-1 justify-between sm:hidden">
-        {% if equipements.has_previous %}
-        <a href="?page={{ equipements.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}"
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}"
             class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Précédent</a>
         {% endif %}
-        {% if equipements.has_next %}
-        <a href="?page={{ equipements.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}"
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}"
             class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Suivant</a>
         {% endif %}
     </div>
@@ -16,25 +16,25 @@
     <div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
         <div>
             <p class="text-sm text-gray-700">
-                Affichage de <span class="font-semibold text-renttech-dark">{{ equipements.start_index }}</span> à <span
-                    class="font-semibold text-renttech-dark">{{ equipements.end_index }}</span> sur <span
-                    class="font-semibold text-renttech-dark">{{ equipements.paginator.count }}</span> résultats
+                Affichage de <span class="font-semibold text-renttech-dark">{{ page_obj.start_index }}</span> à <span
+                    class="font-semibold text-renttech-dark">{{ page_obj.end_index }}</span> sur <span
+                    class="font-semibold text-renttech-dark">{{ page_obj.paginator.count }}</span> résultats
             </p>
         </div>
         <div>
             <nav class="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-                {% if equipements.has_previous %}
-                <a href="?page={{ equipements.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}"
+                {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}"
                     class="relative inline-flex items-center rounded-l-md px-3 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20">Précédent</a>
                 {% endif %}
 
                 <span
                     class="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-renttech-dark ring-1 ring-inset ring-gray-300 bg-gray-50">
-                    Page {{ equipements.number }} / {{ equipements.paginator.num_pages }}
+                    Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
                 </span>
 
-                {% if equipements.has_next %}
-                <a href="?page={{ equipements.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}"
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}"
                     class="relative inline-flex items-center rounded-r-md px-3 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20">Suivant</a>
                 {% endif %}
             </nav>

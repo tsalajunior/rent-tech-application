@@ -1,0 +1,39 @@
+Priorités — cycle de location
+Définir les règles de statut et leur source de vérité
+Clarifier les états : en cours, prolongée, en retard, terminée et annulée. Une location retournée doit être terminée ; le retard devrait être déterminé à partir de la date prévue et de la date du jour, plutôt que de dépendre d’un statut qui peut devenir périmé. Les choix actuels sont dans models.py.
+
+Fiabiliser la disponibilité des équipements
+Lors de la création ou modification d’une location, vérifier côté serveur que chaque équipement est disponible, dans la bonne agence et non déjà affecté à une autre location active. Faire ces vérifications dans une transaction avec verrouillage des équipements pour prévenir deux réservations simultanées. Ne pas se fier uniquement à la liste affichée dans le formulaire : la logique est dans views.py.
+Lors d’une modification, valider la nouvelle sélection avant de libérer ou remplacer les anciens équipements.
+
+Sécuriser le retour et la clôture
+Faire du retour une opération POST idempotente : une location ne peut être clôturée qu’une fois. Dans la même transaction, enregistrer la date réelle, passer la location à terminée et libérer ses équipements. Le retour actuel libère les équipements, mais ne met pas à jour le statut de la location : views.py.
+
+Empêcher la modification ou suppression des locations clôturées
+Appliquer cette règle dans les vues elles-mêmes, pas seulement en masquant les boutons. Vérifier également l’accès par agence et le rôle de l’utilisateur. Les contrôles sont à revoir dans views.py et views.py.
+
+Terminer la prolongation de bout en bout
+Rendre l’action accessible depuis la page de location, ajouter sa route dans urls.py, puis vérifier qu’elle ne s’applique qu’à une location active. Enregistrer l’ancienne et la nouvelle échéance ainsi que l’employé ayant effectué l’opération. La fonction existante recalcule déjà un montant, mais elle n’est pas reliée aux routes et ne formalise pas les pénalités : views.py.
+
+Fixer la règle de calcul avant de coder les pénalités
+Le montant actuel de pénalité n’est pas défini par les éléments examinés. Je proposerais de calculer le supplément à partir des tarifs journaliers enregistrés sur la location, avec une règle de caution explicitement choisie. Les calculs monétaires devraient utiliser Decimal, et non float. Il faut valider cette règle métier avant de l’implémenter.
+
+Ajouter des tests couvrant les cas limites
+Tester notamment : équipement en maintenance, réservation concurrente, modification d’une location, retour répété, location annulée ou terminée, prolongation avec date invalide, accès depuis une autre agence et recalcul des montants. Les tests actuels passent, mais couvrent surtout les PDF, les templates et quelques routes.
+
+Autres améliorations, par priorité
+Sécurité avant déploiement : remplacer les identifiants exposés dans le fichier de suivi, vérifier qu’ils ne sont pas utilisés ailleurs, et sortir les secrets de la configuration versionnée. Revoir aussi DEBUG, la clé Django et les paramètres de production dans settings.py.
+Contrôles d’accès cohérents : appliquer systématiquement les permissions et le cloisonnement par agence dans toutes les vues sensibles, y compris les opérations de suppression.
+Qualité des données : vérifier les incohérences déjà présentes entre le statut d’un équipement et ses locations actives avant de corriger les données existantes.
+Fonctions métier restantes : une fois le cycle fiable, prioriser les rapports et statistiques, puis les exports CSV, notifications et PWA.
+Ergonomie et performance : afficher les statuts de façon cohérente, clarifier les montants à régler et limiter les requêtes répétées sur les listes.
+Je commencerais donc par les points 1 à 4 du cycle, puis je connecterais la prolongation et ses règles de calcul. Aucun code n’a été modifié : c’est le plan d’intervention proposé.
+
+En bref : le cycle fonctionnel que nous avions priorisé est en place ; 
+la prochaine priorité conseillée est la sécurité et la revue complète 
+des autorisations, puis l’audit des données, avant d’entamer les rapports et statistiques.
+
+
+Restent notamment la revue complète de la sécurité et des autorisations, 
+l’audit des données existantes, les rapports et statistiques financiers, 
+les notifications, la PWA et des optimisations générales de performance.

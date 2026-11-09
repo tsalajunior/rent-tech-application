@@ -58,14 +58,14 @@ docker exec -it renttech_web_container python manage.py migrate
 * ajouter le logo, la description et le nom de l'entreprise sur la facture pdf ✅
 * location déjà clôturée ne peut plus être modifiée ni supprimée ✅
 * dropdown menu dans la navbar ✅
-* annuler location
+* annuler location et tenir compte au niveau des stats du dashboard
 * statut d'une location (en cours, terminée, étendue) & gestion des retours d'équipements (un
-équipement retourné passe de loué à disponible)
-* étendre la période de location (pénalités)
+équipement retourné passe de loué à disponible) ✅
+* étendre la période de location (pénalités) ✅
+* générer fichier .csv (équipements, clients, locations, utilisateurs) ✅ 
 * notifications
 * états financiers des locations (classement par période et par agence), chiffre d'affaire, 
 générer rapport financiers
 * afficher les statistiques de locations (classement par période et par agence), locations annulées,
 locations étendues, locations terminées, meilleurs clients 
-* générer fichier .csv (équipements, clients, locations)
-* créer le fichier pwa
+* créer l'application pwa

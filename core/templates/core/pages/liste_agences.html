@@ -9,10 +9,16 @@
             <h2 class="text-lg font-bold text-renttech-dark">Agences RentTech</h2>
             <p class="text-xs text-gray-500">Gestion centralisée des implantations géographiques.</p>
         </div>
-        <a href="{% url 'core:agence_ajouter' %}"
-            class="bg-renttech-primary hover:opacity-90 text-white px-4 py-2 rounded-md text-sm font-medium transition shadow-sm whitespace-nowrap">
-            + Nouvelle agence
-        </a>
+        <div class="flex items-center gap-2">
+            <a href="{% url 'core:exporter_agences_csv' %}"
+                class="border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap">
+                Exporter CSV
+            </a>
+            <a href="{% url 'core:agence_ajouter' %}"
+                class="bg-renttech-primary hover:opacity-90 text-white px-4 py-2 rounded-md text-sm font-medium transition shadow-sm whitespace-nowrap">
+                + Nouvelle agence
+            </a>
+        </div>
     </div>
 
     <div class="overflow-x-auto">

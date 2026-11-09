@@ -13,12 +13,17 @@
             {% endif %}
         </form>
 
-        <!-- Bouton Nouvel équipement -->
-         {% if request.user.is_superuser %}
-        <a href="{% url 'core:equipement_ajouter' %}" class="bg-renttech-primary hover:opacity-90 text-white px-4 py-2 rounded-md text-sm font-medium transition shadow-sm whitespace-nowrap">
-            + Nouvel équipement
-        </a>
-        {% endif %}
+        <div class="flex items-center gap-2">
+            <a href="{% url 'core:exporter_equipements_csv' %}"
+                class="border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap">
+                Exporter CSV
+            </a>
+            {% if request.user.is_superuser %}
+            <a href="{% url 'core:equipement_ajouter' %}" class="bg-renttech-primary hover:opacity-90 text-white px-4 py-2 rounded-md text-sm font-medium transition shadow-sm whitespace-nowrap">
+                + Nouvel équipement
+            </a>
+            {% endif %}
+        </div>
     </div>
 
     <!-- Tableau -->
@@ -81,7 +86,7 @@
     </div>
 
     <!-- Pagination -->
-    {% include 'core/molecules/pagination.html' %}
+    {% include 'core/molecules/pagination.html' with page_obj=equipements %}
 </div>
 
 <!-- Script de recherche dynamique en temps réel -->

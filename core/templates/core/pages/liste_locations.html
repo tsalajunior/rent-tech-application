@@ -11,10 +11,16 @@
             <p class="text-xs text-gray-500">Suivi des contrats, des équipements loués et des statuts.</p>
         </div>
         <!-- Accessible à l'admin et au simple user -->
-        <a href="{% url 'core:creer_location' %}"
-            class="bg-renttech-primary hover:opacity-90 text-white px-4 py-2 rounded-md text-sm font-medium transition shadow-sm whitespace-nowrap">
-            + Nouvelle location
-        </a>
+        <div class="flex items-center gap-2">
+            <a href="{% url 'core:exporter_locations_csv' %}"
+                class="border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap">
+                Exporter CSV
+            </a>
+            <a href="{% url 'core:creer_location' %}"
+                class="bg-renttech-primary hover:opacity-90 text-white px-4 py-2 rounded-md text-sm font-medium transition shadow-sm whitespace-nowrap">
+                + Nouvelle location
+            </a>
+        </div>
     </div>
 
     <div class="overflow-x-auto">
@@ -56,13 +62,15 @@
                         {{ loc.montant_total }} €
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        {% if loc.statut == 'en_cours' %}
+                        {% if loc.statut_affiche == 'en_cours' %}
                         <span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">En
                             cours</span>
-                        {% elif loc.statut == 'annulee' %}
+                        {% elif loc.statut_affiche == 'etendue' %}
+                        <span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800">Étendue</span>
+                        {% elif loc.statut_affiche == 'annulee' %}
                         <span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">Annulée</span>
-                        {% elif loc.statut == 'retard' %}
-                        <span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">En retard /Étendue</span>
+                        {% elif loc.statut_affiche == 'retard' %}
+                        <span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">En retard</span>
                         {% else %}
                         <span
                             class="px-2.5 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Terminée</span>
@@ -91,25 +99,29 @@
                                     Détails du contrat
                                 </a>
 
-                                <!-- 🟢 Option d'Annulation (Uniquement si dans la fenêtre des 24h) -->
                                 {% if loc.est_annulable %}
                                 <form action="{% url 'core:annuler_location' loc.id %}" method="POST" class="block">
                                     {% csrf_token %}
                                     <button type="submit"
                                         class="w-full text-left px-4 py-2 text-xs text-orange-600 hover:bg-orange-50 font-medium"
-                                        onclick="return confirm('Confirmer l\'annulation de cette location ? (Remboursement de 90% du loyer + caution)')">
+                                        onclick="return confirm('Annuler dans les 24 heures suivant la création ? Le client recevra 90 % du loyer et la totalité de la caution. L’agence conserve 10 % du loyer.')">
                                         Annuler la location
                                     </button>
                                 </form>
+                                {% elif loc.est_active %}
+                                <span class="block px-4 py-2 text-xs text-gray-400"
+                                    aria-disabled="true" title="L'annulation est limitée aux 24 heures suivant la création.">
+                                    Annulation impossible : délai de 24 h dépassé
+                                </span>
                                 {% endif %}
 
-                                {% if not loc.retour_reelle and loc.statut != 'annulee' %}
+                                {% if loc.est_active %}
                                 <!-- Clôture / Retour rapide -->
                                 <form action="{% url 'core:retourner_location' loc.id %}" method="POST" class="block">
                                     {% csrf_token %}
                                     <button type="submit"
                                         class="w-full text-left px-4 py-2 text-xs text-green-600 hover:bg-gray-50 font-medium"
-                                        onclick="return confirm('Confirmer le retour et la restitution des équipements ?')">
+                                        onclick="return confirm('Confirmer le retour ? La caution restante sera remboursée après déduction des pénalités éventuelles ; le montant de location reste dû.')">
                                         Clôturer / Retour
                                     </button>
                                 </form>
@@ -136,7 +148,7 @@
 
                 <!-- Modale de suppression (Uniquement si admin) -->
                 {% if request.user.is_superuser %}
-                {% if request.user.is_superuser and not loc.retour_reelle %}
+                {% if request.user.is_superuser and loc.est_active %}
                 <dialog id="delete_modal_{{ loc.id }}"
                     class="m-auto p-0 rounded-lg shadow-2xl backdrop:bg-gray-900/50 max-w-md w-full bg-white">
                     <div class="p-6">

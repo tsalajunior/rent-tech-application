@@ -17,6 +17,13 @@
         <div>
             <h1 class="text-xl font-bold text-renttech-dark">Contrat de location #{{ location.id }}</h1>
             <p class="text-gray-500 text-sm">Agence : {{ location.agence.nom }} | Créé par : {{ location.employe.username }}</p>
+            <p class="mt-2 text-sm font-semibold text-gray-700">Statut :
+                {% if location.statut_affiche == 'en_cours' %}En cours
+                {% elif location.statut_affiche == 'etendue' %}Étendue
+                {% elif location.statut_affiche == 'retard' %}En retard
+                {% elif location.statut_affiche == 'annulee' %}Annulée
+                {% else %}Terminée{% endif %}
+            </p>
         </div>
         <div class="flex gap-2">
             <a href="{% url 'core:telecharger_location_pdf' location.id %}" class="px-4 py-2 bg-renttech-primary hover:opacity-90 text-white rounded-md text-sm font-medium transition">
@@ -73,9 +80,76 @@
             <span class="font-semibold text-gray-800">{{ location.montant_total }} €</span>
         </div>
         <div class="flex justify-between text-sm text-gray-600">
+            <span>Pénalité de retard (10 % par jour) :</span>
+            <span class="font-semibold text-gray-800">{{ location.penalite_retard }} €</span>
+        </div>
+        <div class="flex justify-between text-sm text-gray-600">
             <span>Caution (50%) :</span>
             <span class="font-semibold text-gray-800">{{ location.caution }} €</span>
         </div>
     </div>
+
+    {% if location.statut == 'annulee' or location.retour_reelle or location.statut == 'terminee' %}
+    <div class="mt-4 border border-amber-200 bg-amber-50 rounded-lg p-5 space-y-2">
+        <h4 class="text-sm font-bold text-amber-900 uppercase tracking-wider">Remboursement à effectuer</h4>
+        {% if location.statut == 'annulee' %}
+        <div class="flex justify-between text-sm text-amber-900">
+            <span>90 % du montant de location :</span>
+            <span class="font-semibold">{{ location.montant_loyer_a_rembourser }} €</span>
+        </div>
+        <div class="flex justify-between text-sm text-amber-900">
+            <span>10 % conservés par l’agence :</span>
+            <span class="font-semibold">{{ location.montant_loyer_conserve }} €</span>
+        </div>
+        {% else %}
+        <p class="text-sm text-amber-900">Le montant de location n’est pas remboursé après le début de la location.</p>
+        {% endif %}
+        <div class="flex justify-between text-sm text-amber-900">
+            <span>
+                {% if location.statut == 'annulee' %}
+                Caution à rembourser intégralement :
+                {% else %}
+                Caution restante à rembourser après pénalités :
+                {% endif %}
+            </span>
+            <span class="font-semibold">{{ location.montant_caution_a_rembourser }} €</span>
+        </div>
+        <p class="text-xs text-amber-800">Montant à traiter par l’agence ; aucun paiement électronique n’est exécuté par l’application.</p>
+    </div>
+    {% endif %}
+
+    {% if location.prolongations.all %}
+    <div class="mt-6">
+        <h4 class="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3">Historique des prolongations</h4>
+        <div class="space-y-2">
+            {% for prolongation in location.prolongations.all %}
+            <div class="flex flex-wrap justify-between gap-2 border border-gray-200 rounded-md p-3 text-sm">
+                <span>Du {{ prolongation.ancienne_date|date:"d/m/Y" }} au {{ prolongation.nouvelle_date|date:"d/m/Y" }}</span>
+                <span class="font-semibold">{{ prolongation.montant_supplementaire }} € ({{ prolongation.employe.username|default:"Utilisateur inconnu" }})</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if location.est_active %}
+    <form method="post" action="{% url 'core:etendre_location' location.id %}" class="mt-6 border-t border-gray-200 pt-6 space-y-3">
+        {% csrf_token %}
+        <h4 class="text-sm font-bold text-gray-700 uppercase tracking-wider">Prolonger la location</h4>
+        <p class="text-xs text-gray-500">Le supplément de location suit le tarif journalier enregistré. Si la prolongation est faite après l’échéance, une pénalité de 10 % du montant total est ajoutée pour chaque jour de retard écoulé.</p>
+        <div class="flex flex-wrap items-end gap-3">
+            <div>
+                <label for="{{ prolongation_form.nouvelle_date.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">Nouvelle date de retour</label>
+                {{ prolongation_form.nouvelle_date }}
+            </div>
+            <button type="submit" class="px-4 py-2 bg-renttech-primary hover:opacity-90 text-white rounded-md text-sm font-medium transition">
+                Confirmer la prolongation
+            </button>
+        </div>
+        {% if prolongation_form.nouvelle_date.errors %}
+        <p class="text-red-600 text-xs">{{ prolongation_form.nouvelle_date.errors.0 }}</p>
+        {% endif %}
+    </form>
+    {% endif %}
 </div>
 {% endblock %}
