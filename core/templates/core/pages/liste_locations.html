@@ -11,11 +11,44 @@
             <p class="text-xs text-gray-500">Suivi des contrats, des équipements loués et des statuts.</p>
         </div>
         <!-- Accessible à l'admin et au simple user -->
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
             <a href="{% url 'core:exporter_locations_csv' %}"
                 class="border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-md text-sm font-medium transition whitespace-nowrap">
                 Exporter CSV
             </a>
+            <form method="get" action="{% url 'core:liste_locations' %}"
+                class="flex flex-wrap items-center gap-2">
+                <label for="location-period" class="sr-only">Période des dates de début</label>
+                <select id="location-period" name="periode"
+                    class="px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 focus:ring-2 focus:ring-renttech-primary focus:outline-none">
+                    <option value="tout" {% if filtre_periode == 'tout' %}selected{% endif %}>Toutes les périodes</option>
+                    <option value="30j" {% if filtre_periode == '30j' %}selected{% endif %}>30 derniers jours</option>
+                    <option value="3m" {% if filtre_periode == '3m' %}selected{% endif %}>3 derniers mois</option>
+                    <option value="6m" {% if filtre_periode == '6m' %}selected{% endif %}>6 derniers mois</option>
+                    <option value="annee" {% if filtre_periode == 'annee' %}selected{% endif %}>Cette année</option>
+                    <option value="personnalisee" {% if filtre_periode == 'personnalisee' %}selected{% endif %}>Période personnalisée</option>
+                </select>
+                <label for="location-date-start" class="sr-only">Date de début minimale</label>
+                <input id="location-date-start" type="date" name="date_debut"
+                    value="{{ date_debut_filtre }}"
+                    class="px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 focus:ring-2 focus:ring-renttech-primary focus:outline-none"
+                    aria-label="Date de début minimale">
+                <label for="location-date-end" class="sr-only">Date de début maximale</label>
+                <input id="location-date-end" type="date" name="date_fin"
+                    value="{{ date_fin_filtre }}"
+                    class="px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 focus:ring-2 focus:ring-renttech-primary focus:outline-none"
+                    aria-label="Date de début maximale">
+                <button type="submit"
+                    class="border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-md text-sm font-medium transition">
+                    Filtrer
+                </button>
+                {% if filtre_periode != 'tout' or date_debut_filtre or date_fin_filtre %}
+                <a href="{% url 'core:liste_locations' %}"
+                    class="text-gray-500 hover:text-gray-700 text-sm underline whitespace-nowrap">
+                    Réinitialiser
+                </a>
+                {% endif %}
+            </form>
             <a href="{% url 'core:creer_location' %}"
                 class="bg-renttech-primary hover:opacity-90 text-white px-4 py-2 rounded-md text-sm font-medium transition shadow-sm whitespace-nowrap">
                 + Nouvelle location
@@ -196,6 +229,7 @@
         </table>
     </div>
 
+    {% include 'core/molecules/pagination.html' with page_obj=page_obj %}
 </div>
 <script>
     function toggleDropdown(menuId, event) {

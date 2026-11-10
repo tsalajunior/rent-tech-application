@@ -3,11 +3,11 @@
     <!-- Version mobile -->
     <div class="flex flex-1 justify-between sm:hidden">
         {% if page_obj.has_previous %}
-        <a href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}"
+        <a href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if filtre_periode %}&periode={{ filtre_periode }}{% endif %}{% if date_debut_filtre %}&date_debut={{ date_debut_filtre }}{% endif %}{% if date_fin_filtre %}&date_fin={{ date_fin_filtre }}{% endif %}"
             class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Précédent</a>
         {% endif %}
         {% if page_obj.has_next %}
-        <a href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}"
+        <a href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if filtre_periode %}&periode={{ filtre_periode }}{% endif %}{% if date_debut_filtre %}&date_debut={{ date_debut_filtre }}{% endif %}{% if date_fin_filtre %}&date_fin={{ date_fin_filtre }}{% endif %}"
             class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Suivant</a>
         {% endif %}
     </div>
@@ -24,7 +24,7 @@
         <div>
             <nav class="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
                 {% if page_obj.has_previous %}
-                <a href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}"
+                <a href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if filtre_periode %}&periode={{ filtre_periode }}{% endif %}{% if date_debut_filtre %}&date_debut={{ date_debut_filtre }}{% endif %}{% if date_fin_filtre %}&date_fin={{ date_fin_filtre }}{% endif %}"
                     class="relative inline-flex items-center rounded-l-md px-3 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20">Précédent</a>
                 {% endif %}
 
@@ -34,7 +34,7 @@
                 </span>
 
                 {% if page_obj.has_next %}
-                <a href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}"
+                <a href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if filtre_periode %}&periode={{ filtre_periode }}{% endif %}{% if date_debut_filtre %}&date_debut={{ date_debut_filtre }}{% endif %}{% if date_fin_filtre %}&date_fin={{ date_fin_filtre }}{% endif %}"
                     class="relative inline-flex items-center rounded-r-md px-3 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20">Suivant</a>
                 {% endif %}
             </nav>

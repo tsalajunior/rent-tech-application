@@ -7,6 +7,11 @@ app_name = "core"
 urlpatterns = [
     path("logout/", LogoutView.as_view(next_page="core:login"), name="logout"),
     path("", views.dashboard, name="dashboard"),
+    path(
+        "statistiques/locations/",
+        views.statistiques_locations,
+        name="statistiques_locations",
+    ),
     path("notifications/", views.liste_notifications, name="liste_notifications"),
     path(
         "notifications/<int:pk>/ouvrir/",

@@ -431,6 +431,91 @@ class LocationLifecycleIntegrationTests(TestCase):
             )
         return location
 
+    def test_location_list_paginates_ten_and_shows_navigation(self):
+        created_locations = [
+            self.creer_location() for _ in range(21)
+        ]
+
+        first_page = self.client.get(reverse("core:liste_locations"))
+        second_page = self.client.get(
+            reverse("core:liste_locations"), {"page": 2}
+        )
+        last_page = self.client.get(
+            reverse("core:liste_locations"), {"page": 3}
+        )
+
+        self.assertEqual(first_page.status_code, 200)
+        self.assertEqual(first_page.context["page_obj"].paginator.per_page, 10)
+        self.assertEqual(len(first_page.context["locations"]), 10)
+        self.assertEqual(len(second_page.context["locations"]), 10)
+        self.assertEqual(len(last_page.context["locations"]), 1)
+        self.assertEqual(
+            first_page.context["page_obj"].paginator.count, 21
+        )
+        self.assertContains(first_page, "Affichage de")
+        self.assertContains(first_page, "Page 1 / 3")
+        self.assertContains(first_page, "?page=2")
+        self.assertContains(second_page, "?page=1")
+        self.assertContains(second_page, "?page=3")
+        self.assertEqual(
+            first_page.context["locations"][0].pk,
+            created_locations[-1].pk,
+        )
+
+    def test_location_list_filters_start_date_by_preset_and_custom_range(self):
+        locations_in_recent_period = []
+        for days_ago in range(12):
+            location = self.creer_location()
+            location.date_debut = self.today - timedelta(days=days_ago * 5)
+            location.save(update_fields=["date_debut"])
+            locations_in_recent_period.append(location)
+
+        older_location = self.creer_location()
+        older_location.date_debut = self.today - timedelta(days=120)
+        older_location.save(update_fields=["date_debut"])
+
+        preset_response = self.client.get(
+            reverse("core:liste_locations"), {"periode": "3m"}
+        )
+        self.assertEqual(preset_response.status_code, 200)
+        self.assertEqual(preset_response.context["page_obj"].paginator.count, 12)
+        self.assertEqual(len(preset_response.context["locations"]), 10)
+        self.assertContains(preset_response, "Page 1 / 2")
+        self.assertContains(preset_response, "periode=3m")
+
+        filtered_page = self.client.get(
+            reverse("core:liste_locations"),
+            {"periode": "3m", "page": 2},
+        )
+        self.assertEqual(len(filtered_page.context["locations"]), 2)
+        self.assertContains(filtered_page, "periode=3m")
+        self.assertRegex(
+            filtered_page.content.decode(),
+            r'href="\?page=1(?:&amp;|&)periode=3m"',
+        )
+
+        custom_response = self.client.get(
+            reverse("core:liste_locations"),
+            {
+                "date_debut": (self.today - timedelta(days=10)).isoformat(),
+                "date_fin": (self.today - timedelta(days=5)).isoformat(),
+            },
+        )
+        custom_ids = {
+            location.pk for location in custom_response.context["locations"]
+        }
+        expected_ids = {
+            location.pk
+            for location in locations_in_recent_period
+            if self.today - timedelta(days=10)
+            <= location.date_debut
+            <= self.today - timedelta(days=5)
+        }
+        self.assertEqual(custom_response.context["page_obj"].paginator.count, 2)
+        self.assertSetEqual(custom_ids, expected_ids)
+        self.assertNotIn(older_location.pk, custom_ids)
+        self.assertContains(custom_response, 'value="personnalisee" selected')
+
     def test_return_closes_location_and_releases_equipment_once(self):
         location = self.creer_location(equipement=self.equipement)
         self.equipement.statut = "loue"
@@ -1044,7 +1129,7 @@ class NotificationTests(TestCase):
             categorie=self.categorie,
             agence=self.agence,
         )
-        self.today = date(2026, 11, 9)
+        self.today = timezone.localdate()
 
     def creer_location(self, retour_prevue, statut="en_cours"):
         return Location.objects.create(
@@ -1266,3 +1351,229 @@ class NotificationTests(TestCase):
         self.assertFalse(
             Notification.objects.filter(recipient=self.other_employee).exists()
         )
+
+
+class LocationStatisticsTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            username="admin", email="admin@example.test", password="test-password"
+        )
+        self.agency_one = Agence.objects.create(
+            nom="Agence Paris", ville="Paris", adresse="1 rue test"
+        )
+        self.agency_two = Agence.objects.create(
+            nom="Agence Lyon", ville="Lyon", adresse="2 rue test"
+        )
+        self.category = Categorie.objects.create(nom="Informatique")
+        self.laptop = Equipement.objects.create(
+            reference="LAP-1",
+            nom="Ordinateur",
+            prix_journalier=Decimal("10.00"),
+            categorie=self.category,
+            agence=self.agency_one,
+        )
+        self.camera = Equipement.objects.create(
+            reference="CAM-1",
+            nom="Caméra",
+            prix_journalier=Decimal("15.00"),
+            categorie=self.category,
+            agence=self.agency_two,
+        )
+        self.client_one = Client.objects.create(
+            nom="Martin",
+            prenom="Alice",
+            email="alice@example.test",
+            telephone="0102030405",
+            agence=self.agency_one,
+        )
+        self.client_two = Client.objects.create(
+            nom="Durand",
+            prenom="Bob",
+            email="bob@example.test",
+            telephone="0102030406",
+            agence=self.agency_two,
+        )
+        self.today = date(2026, 11, 10)
+        self.client.force_login(self.admin)
+
+    def creer_location(
+        self,
+        *,
+        client,
+        agency,
+        start,
+        due,
+        returned=None,
+        status="en_cours",
+        equipment=None,
+    ):
+        location = Location.objects.create(
+            client=client,
+            agence=agency,
+            employe=self.admin,
+            statut=status,
+            date_debut=start,
+            retour_prevue=due,
+            retour_reelle=returned,
+            caution=Decimal("10.00"),
+            montant_total=Decimal("20.00"),
+        )
+        if equipment:
+            LocationEquipement.objects.create(
+                location=location,
+                equipement=equipment,
+                prix_journalier_applique=equipment.prix_journalier,
+            )
+        return location
+
+    def test_statistics_aggregate_locations_equipment_clients_and_late_returns(self):
+        self.creer_location(
+            client=self.client_one,
+            agency=self.agency_one,
+            start=date(2026, 11, 1),
+            due=date(2026, 11, 3),
+            returned=date(2026, 11, 5),
+            status="terminee",
+            equipment=self.laptop,
+        )
+        self.creer_location(
+            client=self.client_one,
+            agency=self.agency_one,
+            start=date(2026, 11, 2),
+            due=date(2026, 11, 20),
+            status="en_cours",
+            equipment=self.laptop,
+        )
+        self.creer_location(
+            client=self.client_two,
+            agency=self.agency_two,
+            start=date(2026, 10, 4),
+            due=date(2026, 10, 5),
+            returned=date(2026, 10, 8),
+            status="terminee",
+            equipment=self.camera,
+        )
+        self.creer_location(
+            client=self.client_one,
+            agency=self.agency_one,
+            start=date(2026, 11, 3),
+            due=date(2026, 11, 9),
+            status="en_cours",
+            equipment=self.laptop,
+        )
+
+        with patch("core.views.timezone.localdate", return_value=self.today):
+            response = self.client.get(
+                reverse("core:statistiques_locations"),
+                {"periode": "tout"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        stats = response.context["stats"]
+        self.assertEqual(stats["total_locations"], 4)
+        self.assertEqual(stats["current_overdue"], 1)
+        self.assertEqual(stats["monthly_labels"], ["10/2026", "11/2026"])
+        self.assertEqual(stats["monthly_values"], [1, 3])
+        self.assertEqual(stats["equipment_labels"][0], "Ordinateur (Informatique)")
+        self.assertEqual(stats["equipment_values"][0], 3)
+        self.assertEqual(stats["client_labels"][0], "Alice Martin")
+        self.assertEqual(stats["client_values"][0], 3)
+        self.assertEqual(stats["agency_labels"], ["Agence Paris", "Agence Lyon"])
+        self.assertEqual(stats["agency_values"], [3, 1])
+        self.assertEqual(stats["late_values"], [1, 1])
+
+    def test_employee_statistics_are_limited_to_their_agency(self):
+        self.creer_location(
+            client=self.client_one,
+            agency=self.agency_one,
+            start=date(2026, 11, 2),
+            due=date(2026, 11, 4),
+            equipment=self.laptop,
+        )
+        self.creer_location(
+            client=self.client_two,
+            agency=self.agency_two,
+            start=date(2026, 11, 3),
+            due=date(2026, 11, 5),
+            equipment=self.camera,
+        )
+        employee = User.objects.create_user(
+            username="employee", password="test-password"
+        )
+        ProfilEmploye.objects.create(user=employee, agence=self.agency_one)
+        self.client.force_login(employee)
+
+        response = self.client.get(
+            reverse("core:statistiques_locations"),
+            {"periode": "tout", "agence": self.agency_two.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["stats"]["total_locations"], 1)
+        self.assertEqual(response.context["stats"]["agency_labels"], [])
+        self.assertEqual(response.context["stats"]["client_labels"], ["Alice Martin"])
+        self.assertNotContains(response, "Agence Lyon")
+        self.assertNotContains(response, 'name="agence"')
+
+    def test_admin_can_filter_by_agency_and_status_and_page_renders_charts(self):
+        active = self.creer_location(
+            client=self.client_one,
+            agency=self.agency_one,
+            start=date(2026, 11, 2),
+            due=date(2026, 11, 20),
+            equipment=self.laptop,
+        )
+        self.creer_location(
+            client=self.client_one,
+            agency=self.agency_one,
+            start=date(2026, 11, 3),
+            due=date(2026, 11, 4),
+            returned=date(2026, 11, 6),
+            status="terminee",
+            equipment=self.laptop,
+        )
+
+        with patch("core.views.timezone.localdate", return_value=self.today):
+            response = self.client.get(
+                reverse("core:statistiques_locations"),
+                {
+                    "periode": "tout",
+                    "agence": self.agency_one.pk,
+                    "statut": "en_cours",
+                },
+            )
+
+        self.assertEqual(response.context["stats"]["total_locations"], 1)
+        self.assertEqual(response.context["stats"]["agency_labels"], [])
+        self.assertEqual(response.context["status_filter"], "en_cours")
+        self.assertContains(response, "Statistiques des locations")
+        self.assertContains(response, "Équipements les plus loués")
+        self.assertContains(response, "Clients les plus réguliers")
+        self.assertContains(response, "Retours effectués en retard")
+        self.assertContains(response, f"Agence Paris")
+        self.assertEqual(active.statut, "en_cours")
+
+    def test_invalid_custom_date_range_shows_error_without_crashing(self):
+        self.creer_location(
+            client=self.client_one,
+            agency=self.agency_one,
+            start=date(2026, 11, 2),
+            due=date(2026, 11, 4),
+            returned=date(2026, 11, 6),
+            status="terminee",
+            equipment=self.laptop,
+        )
+        with patch("core.views.timezone.localdate", return_value=self.today):
+            response = self.client.get(
+                reverse("core:statistiques_locations"),
+                {
+                    "periode": "personnalisee",
+                    "date_debut": "2026-11-15",
+                    "date_fin": "2026-11-01",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["stats"]["total_locations"], 0)
+        self.assertEqual(response.context["stats"]["late_values"], [0])
+        self.assertContains(response, "période personnalisée est invalide")

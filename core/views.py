@@ -1,3 +1,4 @@
+import calendar
 import csv
 from io import BytesIO, StringIO
 
@@ -11,6 +12,7 @@ from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth import update_session_auth_hash
 from django.contrib import messages
 from django.db import transaction
+from django.utils.dateparse import parse_date
 from django.utils import timezone
 from decimal import Decimal, ROUND_HALF_UP
 from .models import (
@@ -29,6 +31,7 @@ from .notifications import (
     notify_location_event,
     notify_event,
 )
+from .statistics import STATUS_CHOICES, build_location_statistics, filter_location_status
 from django.views.decorators.cache import never_cache
 from django.core.paginator import Paginator
 from django.db.models import Q
@@ -139,6 +142,127 @@ def _montants_location_csv(location, aujourd_hui):
         montant_final = location.montant_total + penalite
 
     return _arrondir_montant(remboursement), _arrondir_montant(montant_final)
+
+
+def _date_decalee_en_mois(valeur, mois):
+    mois_indexe = valeur.year * 12 + valeur.month - 1 + mois
+    annee, mois_indexe = divmod(mois_indexe, 12)
+    mois = mois_indexe + 1
+    jour = min(valeur.day, calendar.monthrange(annee, mois)[1])
+    return valeur.replace(year=annee, month=mois, day=jour)
+
+
+@login_required
+@never_cache
+def statistiques_locations(request):
+    user = request.user
+    today = timezone.localdate()
+    period = request.GET.get("periode", "12m")
+    valid_periods = {"tout", "30j", "3m", "6m", "12m", "annee", "personnalisee"}
+    if period not in valid_periods:
+        period = "12m"
+
+    start_text = request.GET.get("date_debut", "").strip()
+    end_text = request.GET.get("date_fin", "").strip()
+    start_date = None
+    end_date = None
+    valid_date_range = True
+    if start_text or end_text:
+        period = "personnalisee"
+
+    if period == "30j":
+        start_date, end_date = today - timedelta(days=30), today
+    elif period == "3m":
+        start_date, end_date = _date_decalee_en_mois(today, -3), today
+    elif period == "6m":
+        start_date, end_date = _date_decalee_en_mois(today, -6), today
+    elif period == "12m":
+        start_date, end_date = _date_decalee_en_mois(today, -11).replace(day=1), today
+    elif period == "annee":
+        start_date, end_date = today.replace(month=1, day=1), today
+    elif period == "personnalisee":
+        parsed_start = parse_date(start_text) if start_text else None
+        parsed_end = parse_date(end_text) if end_text else None
+        if (
+            (start_text and parsed_start is None)
+            or (end_text and parsed_end is None)
+            or (parsed_start and parsed_end and parsed_start > parsed_end)
+        ):
+            valid_date_range = False
+            messages.error(
+                request,
+                "La période personnalisée est invalide. Vérifiez les dates saisies.",
+            )
+        else:
+            start_date, end_date = parsed_start, parsed_end
+
+    if user.is_superuser:
+        accessible_locations = Location.objects.all()
+        agencies = Agence.objects.order_by("nom")
+        agency_filter = request.GET.get("agence", "").strip()
+        if agency_filter.isdigit() and Agence.objects.filter(pk=agency_filter).exists():
+            accessible_locations = accessible_locations.filter(
+                agence_id=int(agency_filter)
+            )
+        else:
+            agency_filter = ""
+    else:
+        agencies = Agence.objects.none()
+        agency_filter = ""
+        try:
+            agency_id = user.profil.agence_id
+        except AttributeError:
+            agency_id = None
+        accessible_locations = (
+            Location.objects.filter(agence_id=agency_id)
+            if agency_id
+            else Location.objects.none()
+        )
+
+    status = request.GET.get("statut", "tout")
+    valid_statuses = {value for value, _ in STATUS_CHOICES}
+    if status not in valid_statuses:
+        status = "tout"
+
+    locations = accessible_locations
+    if not valid_date_range:
+        locations = locations.none()
+        accessible_agency_locations = accessible_locations.none()
+    else:
+        accessible_agency_locations = accessible_locations
+    if start_date is not None:
+        locations = locations.filter(date_debut__gte=start_date)
+    if end_date is not None:
+        locations = locations.filter(date_debut__lte=end_date)
+    if status != "tout":
+        locations = filter_location_status(locations, status, today)
+
+    stats = build_location_statistics(
+        locations,
+        today=today,
+        start=start_date,
+        end=end_date,
+        agency_comparison=user.is_superuser,
+        agency_filter_applied=bool(agency_filter),
+        status=status,
+        accessible_agency_ids=accessible_agency_locations.order_by().values(
+            "agence_id"
+        ),
+    )
+    return render(
+        request,
+        "core/pages/statistiques_locations.html",
+        {
+            "stats": stats,
+            "agencies": agencies,
+            "agency_filter": agency_filter,
+            "status_filter": status,
+            "status_choices": STATUS_CHOICES,
+            "period_filter": period,
+            "date_debut_filter": start_text,
+            "date_fin_filter": end_text,
+        },
+    )
 
 
 @login_required
@@ -1180,12 +1304,71 @@ def liste_locations(request):
         except AttributeError:
             locations = Location.objects.none()
 
-    # locations = locations.select_related(
-    #     "client", "agence", "employe"
-    # ).prefetch_related("lignes_location__equipement")
-    locations = locations.order_by('-date_creation')
+    aujourd_hui = timezone.localdate()
+    periode = request.GET.get("periode", "tout")
+    date_debut_filtre = request.GET.get("date_debut", "").strip()
+    date_fin_filtre = request.GET.get("date_fin", "").strip()
+    date_min = None
+    date_max = None
+    periode_valide = {"tout", "30j", "3m", "6m", "annee", "personnalisee"}
+    if periode not in periode_valide:
+        periode = "tout"
+    if date_debut_filtre or date_fin_filtre:
+        periode = "personnalisee"
 
-    return render(request, "core/pages/liste_locations.html", {"locations": locations})
+    if periode == "30j":
+        date_min = aujourd_hui - timedelta(days=30)
+        date_max = aujourd_hui
+    elif periode == "3m":
+        date_min = _date_decalee_en_mois(aujourd_hui, -3)
+        date_max = aujourd_hui
+    elif periode == "6m":
+        date_min = _date_decalee_en_mois(aujourd_hui, -6)
+        date_max = aujourd_hui
+    elif periode == "annee":
+        date_min = aujourd_hui.replace(month=1, day=1)
+        date_max = aujourd_hui
+    elif periode == "personnalisee":
+        date_min_parsee = parse_date(date_debut_filtre) if date_debut_filtre else None
+        date_max_parsee = parse_date(date_fin_filtre) if date_fin_filtre else None
+        if (
+            (date_debut_filtre and date_min_parsee is None)
+            or (date_fin_filtre and date_max_parsee is None)
+            or (
+                date_min_parsee
+                and date_max_parsee
+                and date_min_parsee > date_max_parsee
+            )
+        ):
+            messages.error(
+                request,
+                "La période personnalisée est invalide. Vérifiez les dates saisies.",
+            )
+        else:
+            date_min = date_min_parsee
+            date_max = date_max_parsee
+
+    if date_min is not None:
+        locations = locations.filter(date_debut__gte=date_min)
+    if date_max is not None:
+        locations = locations.filter(date_debut__lte=date_max)
+
+    locations = locations.select_related(
+        "client", "agence", "employe"
+    ).order_by("-date_creation", "-pk")
+    page_obj = Paginator(locations, 10).get_page(request.GET.get("page"))
+
+    return render(
+        request,
+        "core/pages/liste_locations.html",
+        {
+            "locations": page_obj,
+            "page_obj": page_obj,
+            "filtre_periode": periode,
+            "date_debut_filtre": date_debut_filtre,
+            "date_fin_filtre": date_fin_filtre,
+        },
+    )
 
 
 @login_required

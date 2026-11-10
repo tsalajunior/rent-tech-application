@@ -25,7 +25,7 @@ Autres améliorations, par priorité
 Sécurité avant déploiement : remplacer les identifiants exposés dans le fichier de suivi, vérifier qu’ils ne sont pas utilisés ailleurs, et sortir les secrets de la configuration versionnée. Revoir aussi DEBUG, la clé Django et les paramètres de production dans settings.py.
 Contrôles d’accès cohérents : appliquer systématiquement les permissions et le cloisonnement par agence dans toutes les vues sensibles, y compris les opérations de suppression.
 Qualité des données : vérifier les incohérences déjà présentes entre le statut d’un équipement et ses locations actives avant de corriger les données existantes.
-Fonctions métier restantes : une fois le cycle fiable, prioriser les rapports et statistiques, puis les exports CSV, les notifications et la PWA. Le centre de notifications in-app et les rappels quotidiens sont implémentés ; les rapports, statistiques et la PWA restent à réaliser.
+Fonctions métier restantes : une fois le cycle fiable, prioriser les rapports et statistiques, puis les exports CSV, les notifications et la PWA. Les exports CSV, le centre de notifications in-app, les rappels quotidiens et les statistiques non financières des locations sont implémentés ; les rapports financiers et la PWA restent à réaliser.
 Ergonomie et performance : afficher les statuts de façon cohérente, clarifier les montants à régler et limiter les requêtes répétées sur les listes.
 Je commencerais donc par les points 1 à 4 du cycle, puis je connecterais la prolongation et ses règles de calcul. Aucun code n’a été modifié : c’est le plan d’intervention proposé.
 
@@ -34,8 +34,8 @@ la prochaine priorité conseillée est la sécurité et la revue complète
 des autorisations, puis l’audit des données, avant d’entamer les rapports et statistiques.
 
 
-Restent notamment la revue complète de la sécurité et des autorisations, 
-l’audit des données existantes, les rapports et statistiques financiers, 
-les notifications, la PWA et des optimisations générales de performance.
+Restent notamment la revue complète de la sécurité et des autorisations,
+l’audit des données existantes, les rapports financiers, la PWA et des
+optimisations générales de performance.
 
 Les rappels automatiques sont exécutés par le service Docker « scheduler » à 08:00, heure locale. Après application des migrations, démarrer les services Docker pour l’activer.

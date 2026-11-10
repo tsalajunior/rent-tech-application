@@ -1,0 +1,199 @@
+{% extends 'core/templates/base.html' %}
+
+{% block title %}RentTech - Statistiques des locations{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+    <div>
+        <h1 class="text-2xl font-bold text-renttech-dark">Statistiques des locations</h1>
+        <p class="mt-1 text-sm text-gray-600">Volumes et tendances des locations, sans données financières.</p>
+    </div>
+
+    <form method="get" class="bg-white shadow-sm rounded-lg border border-gray-200 p-4 flex flex-wrap items-end gap-3">
+        <div>
+            <label for="stats-period" class="block text-xs font-medium text-gray-600 mb-1">Période</label>
+            <select id="stats-period" name="periode"
+                class="px-3 py-2 border border-gray-300 rounded-md text-sm">
+                <option value="12m" {% if period_filter == '12m' %}selected{% endif %}>12 derniers mois</option>
+                <option value="30j" {% if period_filter == '30j' %}selected{% endif %}>30 derniers jours</option>
+                <option value="3m" {% if period_filter == '3m' %}selected{% endif %}>3 derniers mois</option>
+                <option value="6m" {% if period_filter == '6m' %}selected{% endif %}>6 derniers mois</option>
+                <option value="annee" {% if period_filter == 'annee' %}selected{% endif %}>Cette année</option>
+                <option value="tout" {% if period_filter == 'tout' %}selected{% endif %}>Toute la période</option>
+                <option value="personnalisee" {% if period_filter == 'personnalisee' %}selected{% endif %}>Période personnalisée</option>
+            </select>
+        </div>
+        <div>
+            <label for="stats-start" class="block text-xs font-medium text-gray-600 mb-1">Date de début min.</label>
+            <input id="stats-start" type="date" name="date_debut" value="{{ date_debut_filter }}"
+                class="px-3 py-2 border border-gray-300 rounded-md text-sm">
+        </div>
+        <div>
+            <label for="stats-end" class="block text-xs font-medium text-gray-600 mb-1">Date de début max.</label>
+            <input id="stats-end" type="date" name="date_fin" value="{{ date_fin_filter }}"
+                class="px-3 py-2 border border-gray-300 rounded-md text-sm">
+        </div>
+        {% if request.user.is_superuser %}
+        <div>
+            <label for="stats-agency" class="block text-xs font-medium text-gray-600 mb-1">Agence</label>
+            <select id="stats-agency" name="agence" class="px-3 py-2 border border-gray-300 rounded-md text-sm">
+                <option value="">Toutes les agences</option>
+                {% for agency in agencies %}
+                <option value="{{ agency.pk }}" {% if agency_filter == agency.pk|stringformat:"s" %}selected{% endif %}>
+                    {{ agency.nom }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        <div>
+            <label for="stats-status" class="block text-xs font-medium text-gray-600 mb-1">Statut</label>
+            <select id="stats-status" name="statut" class="px-3 py-2 border border-gray-300 rounded-md text-sm">
+                <option value="tout" {% if status_filter == 'tout' %}selected{% endif %}>Tous les statuts</option>
+                {% for value, label in status_choices %}
+                <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit"
+            class="px-4 py-2 bg-renttech-primary hover:opacity-90 text-white rounded-md text-sm font-medium">
+            Appliquer
+        </button>
+        <a href="{% url 'core:statistiques_locations' %}" class="px-2 py-2 text-sm text-gray-600 hover:underline">
+            Réinitialiser
+        </a>
+    </form>
+
+    <section class="grid grid-cols-1 sm:grid-cols-2 gap-4" aria-label="Indicateurs clés">
+        <div class="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+            <p class="text-sm text-gray-500">Locations correspondant aux filtres</p>
+            <p class="mt-1 text-3xl font-bold text-renttech-dark">{{ stats.total_locations }}</p>
+        </div>
+        <div class="bg-white border border-amber-200 rounded-lg p-5 shadow-sm">
+            <p class="text-sm text-gray-500">Locations actuellement en retard</p>
+            <p class="mt-1 text-3xl font-bold text-amber-700">{{ stats.current_overdue }}</p>
+        </div>
+    </section>
+
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <article class="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+            <h2 class="font-semibold text-gray-900">Locations par mois</h2>
+            <p class="text-xs text-gray-500 mt-1">Comptabilisées selon leur date de début.</p>
+            <div class="mt-5 space-y-3">
+                {% for item in stats.charts.monthly %}
+                <div class="grid grid-cols-[4.5rem_1fr_2rem] items-center gap-3 text-sm">
+                    <span class="text-xs text-gray-600">{{ item.label }}</span>
+                    <div class="h-3 bg-gray-100 rounded-full overflow-hidden" role="progressbar"
+                        aria-label="{{ item.label }}" aria-valuemin="0" aria-valuemax="{{ item.value }}"
+                        aria-valuenow="{{ item.value }}">
+                        <div class="h-full bg-blue-600 rounded-full" style="width: {{ item.width }}%"></div>
+                    </div>
+                    <span class="text-right font-medium text-gray-700">{{ item.value }}</span>
+                </div>
+                {% empty %}
+                <p class="text-sm text-gray-500">Aucune donnée pour cette période.</p>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+            <h2 class="font-semibold text-gray-900">Équipements les plus loués</h2>
+            <p class="text-xs text-gray-500 mt-1">Nombre de contrats associés à chaque équipement.</p>
+            <div class="mt-5 space-y-3">
+                {% for item in stats.charts.equipment %}
+                <div class="grid grid-cols-[minmax(0,1fr)_2rem] gap-3 items-center text-sm">
+                    <div class="min-w-0">
+                        <div class="truncate text-gray-700">{{ item.label }}</div>
+                        <div class="mt-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div class="h-full bg-indigo-500 rounded-full" style="width: {{ item.width }}%"></div>
+                        </div>
+                    </div>
+                    <span class="text-right font-medium text-gray-700">{{ item.value }}</span>
+                </div>
+                {% empty %}
+                <p class="text-sm text-gray-500">Aucun équipement loué pour cette période.</p>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+            <h2 class="font-semibold text-gray-900">Catégories les plus louées</h2>
+            <div class="mt-5 space-y-3">
+                {% for item in stats.charts.categories %}
+                <div class="grid grid-cols-[minmax(0,1fr)_2rem] gap-3 items-center text-sm">
+                    <div class="min-w-0">
+                        <div class="truncate text-gray-700">{{ item.label }}</div>
+                        <div class="mt-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div class="h-full bg-violet-500 rounded-full" style="width: {{ item.width }}%"></div>
+                        </div>
+                    </div>
+                    <span class="text-right font-medium text-gray-700">{{ item.value }}</span>
+                </div>
+                {% empty %}
+                <p class="text-sm text-gray-500">Aucune catégorie louée pour cette période.</p>
+                {% endfor %}
+            </div>
+        </article>
+
+        {% if request.user.is_superuser and not agency_filter %}
+        <article class="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+            <h2 class="font-semibold text-gray-900">Locations par agence</h2>
+            <p class="text-xs text-gray-500 mt-1">Comparaison visible uniquement par l’administration centrale.</p>
+            <div class="mt-5 space-y-3">
+                {% for item in stats.charts.agencies %}
+                <div class="grid grid-cols-[minmax(0,1fr)_2rem] gap-3 items-center text-sm">
+                    <div class="min-w-0">
+                        <div class="truncate text-gray-700">{{ item.label }}</div>
+                        <div class="mt-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div class="h-full bg-cyan-600 rounded-full" style="width: {{ item.width }}%"></div>
+                        </div>
+                    </div>
+                    <span class="text-right font-medium text-gray-700">{{ item.value }}</span>
+                </div>
+                {% empty %}
+                <p class="text-sm text-gray-500">Aucune agence avec des locations pour cette période.</p>
+                {% endfor %}
+            </div>
+        </article>
+        {% endif %}
+
+        <article class="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+            <h2 class="font-semibold text-gray-900">Clients les plus réguliers</h2>
+            <p class="text-xs text-gray-500 mt-1">Classés par nombre de contrats, sans données financières.</p>
+            <div class="mt-5 space-y-3">
+                {% for item in stats.charts.clients %}
+                <div class="grid grid-cols-[minmax(0,1fr)_2rem] gap-3 items-center text-sm">
+                    <div class="min-w-0">
+                        <div class="truncate text-gray-700">{{ item.label }}</div>
+                        <div class="mt-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div class="h-full bg-emerald-600 rounded-full" style="width: {{ item.width }}%"></div>
+                        </div>
+                    </div>
+                    <span class="text-right font-medium text-gray-700">{{ item.value }}</span>
+                </div>
+                {% empty %}
+                <p class="text-sm text-gray-500">Aucun client pour cette période.</p>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+            <h2 class="font-semibold text-gray-900">Retours effectués en retard</h2>
+            <p class="text-xs text-gray-500 mt-1">Nombre de retours après l’échéance, regroupés par mois de retour réel ; les filtres de dates s’appliquent à la date de retour pour ce graphique.</p>
+            <div class="mt-5 space-y-3">
+                {% for item in stats.charts.late_returns %}
+                <div class="grid grid-cols-[4.5rem_1fr_2rem] items-center gap-3 text-sm">
+                    <span class="text-xs text-gray-600">{{ item.label }}</span>
+                    <div class="h-3 bg-gray-100 rounded-full overflow-hidden">
+                        <div class="h-full bg-amber-500 rounded-full" style="width: {{ item.width }}%"></div>
+                    </div>
+                    <span class="text-right font-medium text-gray-700">{{ item.value }}</span>
+                </div>
+                {% empty %}
+                <p class="text-sm text-gray-500">Aucun retour en retard sur cette période.</p>
+                {% endfor %}
+            </div>
+        </article>
+    </section>
+</div>
+{% endblock %}
