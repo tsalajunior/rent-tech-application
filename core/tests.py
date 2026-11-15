@@ -28,6 +28,7 @@ from .models import (
 )
 from .views import (
     _arrondir_montant,
+    _financial_pdf_response,
     _prix_location,
     liste_clients,
     liste_locations,
@@ -126,10 +127,13 @@ class LocationTemplateTests(SimpleTestCase):
                 "total_clients": 1,
                 "total_equipements": 2,
                 "locations_en_cours": 3,
+                "chiffre_affaires": Decimal("12.34"),
             }
         )
 
         self.assertIn("Total clients", html)
+        self.assertIn("Chiffre d'affaires généré", html)
+        self.assertIn("12,34 €", html)
         self.assertIn("Voir les équipements", html)
         self.assertNotIn("{% include", html)
 
@@ -1425,6 +1429,272 @@ class LocationStatisticsTests(TestCase):
                 prix_journalier_applique=equipment.prix_journalier,
             )
         return location
+
+    def test_dashboard_revenue_includes_completed_rentals_across_agencies_only(self):
+        returned = self.creer_location(
+            client=self.client_one,
+            agency=self.agency_one,
+            start=date(2026, 11, 1),
+            due=date(2026, 11, 3),
+            returned=date(2026, 11, 5),
+            status="terminee",
+        )
+        returned.montant_total = Decimal("100.00")
+        returned.penalite_retard = Decimal("10.00")
+        returned.save(update_fields=["montant_total", "penalite_retard"])
+
+        other_agency = self.creer_location(
+            client=self.client_two,
+            agency=self.agency_two,
+            start=date(2026, 11, 1),
+            due=date(2026, 11, 3),
+            returned=date(2026, 11, 3),
+            status="terminee",
+        )
+        other_agency.montant_total = Decimal("50.00")
+        other_agency.save(update_fields=["montant_total"])
+
+        self.creer_location(
+            client=self.client_one,
+            agency=self.agency_one,
+            start=date(2026, 11, 1),
+            due=date(2026, 11, 3),
+            status="en_cours",
+        )
+        self.creer_location(
+            client=self.client_one,
+            agency=self.agency_one,
+            start=date(2026, 11, 1),
+            due=date(2026, 11, 3),
+            status="annulee",
+        )
+
+        response = self.client.get(reverse("core:dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["chiffre_affaires"], Decimal("160.00"))
+
+    def test_dashboard_revenue_for_employee_is_limited_to_their_agency(self):
+        own_agency = self.creer_location(
+            client=self.client_one,
+            agency=self.agency_one,
+            start=date(2026, 11, 1),
+            due=date(2026, 11, 3),
+            returned=date(2026, 11, 3),
+            status="terminee",
+        )
+        own_agency.montant_total = Decimal("100.00")
+        own_agency.save(update_fields=["montant_total"])
+
+        other_agency = self.creer_location(
+            client=self.client_two,
+            agency=self.agency_two,
+            start=date(2026, 11, 1),
+            due=date(2026, 11, 3),
+            returned=date(2026, 11, 3),
+            status="terminee",
+        )
+        other_agency.montant_total = Decimal("500.00")
+        other_agency.save(update_fields=["montant_total"])
+
+        employee = User.objects.create_user(
+            username="finance_employee", password="test-password"
+        )
+        ProfilEmploye.objects.create(user=employee, agence=self.agency_one)
+        self.client.force_login(employee)
+
+        response = self.client.get(reverse("core:dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["chiffre_affaires"], Decimal("100.00"))
+
+    def test_finance_report_filters_metrics_and_generates_pdf(self):
+        self.admin.first_name = "Finance"
+        self.admin.last_name = "Admin"
+        self.admin.save(update_fields=["first_name", "last_name"])
+
+        returned = self.creer_location(
+            client=self.client_one,
+            agency=self.agency_one,
+            start=date(2026, 11, 1),
+            due=date(2026, 11, 3),
+            returned=date(2026, 11, 5),
+            status="terminee",
+            equipment=self.laptop,
+        )
+        returned.montant_total = Decimal("100.00")
+        returned.penalite_retard = Decimal("20.00")
+        returned.caution = Decimal("50.00")
+        returned.save(
+            update_fields=["montant_total", "penalite_retard", "caution"]
+        )
+
+        on_time = self.creer_location(
+            client=self.client_one,
+            agency=self.agency_one,
+            start=date(2026, 11, 1),
+            due=date(2026, 11, 7),
+            returned=date(2026, 11, 7),
+            status="terminee",
+        )
+        on_time.montant_total = Decimal("10.00")
+        on_time.caution = Decimal("10.00")
+        on_time.save(update_fields=["montant_total", "caution"])
+
+        other_agency = self.creer_location(
+            client=self.client_two,
+            agency=self.agency_two,
+            start=date(2026, 10, 20),
+            due=date(2026, 10, 22),
+            returned=date(2026, 10, 22),
+            status="terminee",
+        )
+        other_agency.montant_total = Decimal("500.00")
+        other_agency.save(update_fields=["montant_total"])
+
+        overdue = self.creer_location(
+            client=self.client_one,
+            agency=self.agency_one,
+            start=date(2026, 11, 1),
+            due=date(2026, 11, 8),
+        )
+        overdue.montant_total = Decimal("100.00")
+        overdue.caution = Decimal("50.00")
+        overdue.save(update_fields=["montant_total", "caution"])
+
+        cancelled = self.creer_location(
+            client=self.client_one,
+            agency=self.agency_one,
+            start=date(2026, 11, 1),
+            due=date(2026, 11, 3),
+            status="annulee",
+        )
+        cancelled.montant_total = Decimal("900.00")
+        cancelled.save(update_fields=["montant_total"])
+
+        filters = {
+            "date_debut": "2026-11-01",
+            "date_fin": "2026-11-10",
+            "agence": self.agency_one.pk,
+        }
+        with patch("core.views.timezone.localdate", return_value=self.today):
+            response = self.client.get(reverse("core:finances"), filters)
+
+        self.assertEqual(response.status_code, 200)
+        stats = response.context["stats"]
+        self.assertEqual(stats["chiffre_affaires"], Decimal("130.00"))
+        self.assertEqual(stats["montant_en_attente"], Decimal("120.00"))
+        self.assertEqual(stats["penalites_generees"], Decimal("20.00"))
+        self.assertEqual(stats["penalites_en_attente"], Decimal("20.00"))
+        self.assertEqual(stats["cautions_a_restituer"], Decimal("40.00"))
+        self.assertEqual(
+            stats["cautions_a_restituer_sans_retard"], Decimal("10.00")
+        )
+        self.assertEqual(stats["cautions_retenues"], Decimal("20.00"))
+        self.assertEqual(
+            stats["revenus_par_agence"],
+            [{"label": "Agence Paris", "amount": Decimal("130.00")}],
+        )
+        self.assertEqual(
+            stats["revenus_par_client"],
+            [{"label": "Alice Martin", "amount": Decimal("130.00")}],
+        )
+        self.assertEqual(
+            stats["revenus_par_equipement"],
+            [{"label": "Ordinateur (LAP-1)", "amount": Decimal("20.00")}],
+        )
+        self.assertContains(response, "Finances")
+        self.assertContains(response, "Télécharger le rapport PDF")
+
+        with patch(
+            "core.views._financial_pdf_response",
+            wraps=_financial_pdf_response,
+        ) as pdf_generator:
+            with patch("core.views.timezone.localdate", return_value=self.today):
+                pdf_response = self.client.get(
+                    reverse("core:finances"), {**filters, "format": "pdf"}
+                )
+        self.assertEqual(pdf_response.status_code, 200)
+        self.assertEqual(pdf_response["Content-Type"], "application/pdf")
+        self.assertTrue(pdf_response.content.startswith(b"%PDF"))
+        self.assertEqual(
+            pdf_generator.call_args.kwargs["initiated_by"], "Finance Admin"
+        )
+        self.assertIn(
+            'filename="rapport-financier-2026-11-10-agence-paris.pdf"',
+            pdf_response["Content-Disposition"],
+        )
+
+        with patch("core.views.timezone.localdate", return_value=self.today):
+            central_pdf = self.client.get(
+                reverse("core:finances"),
+                {
+                    "date_debut": filters["date_debut"],
+                    "date_fin": filters["date_fin"],
+                    "format": "pdf",
+                },
+            )
+        self.assertIn(
+            'filename="rapport-financier-2026-11-10-centrale.pdf"',
+            central_pdf["Content-Disposition"],
+        )
+
+    def test_finance_report_invalid_filters_show_error_instead_of_pdf(self):
+        response = self.client.get(
+            reverse("core:finances"),
+            {"date_debut": "not-a-date", "format": "pdf"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "text/html; charset=utf-8")
+        self.assertContains(response, "période financière est invalide")
+        self.assertEqual(
+            response.context["stats"]["chiffre_affaires"], Decimal("0.00")
+        )
+
+    def test_finance_report_for_employee_cannot_show_other_agency_data(self):
+        own_agency = self.creer_location(
+            client=self.client_one,
+            agency=self.agency_one,
+            start=date(2026, 11, 1),
+            due=date(2026, 11, 3),
+            returned=date(2026, 11, 3),
+            status="terminee",
+        )
+        own_agency.montant_total = Decimal("100.00")
+        own_agency.save(update_fields=["montant_total"])
+
+        other_agency = self.creer_location(
+            client=self.client_two,
+            agency=self.agency_two,
+            start=date(2026, 11, 1),
+            due=date(2026, 11, 3),
+            returned=date(2026, 11, 3),
+            status="terminee",
+        )
+        other_agency.montant_total = Decimal("500.00")
+        other_agency.save(update_fields=["montant_total"])
+
+        employee = User.objects.create_user(
+            username="finance_page_employee", password="test-password"
+        )
+        ProfilEmploye.objects.create(user=employee, agence=self.agency_one)
+        self.client.force_login(employee)
+
+        response = self.client.get(
+            reverse("core:finances"),
+            {"agence": self.agency_two.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.context["stats"]["chiffre_affaires"], Decimal("100.00")
+        )
+        self.assertEqual(
+            response.context["stats"]["revenus_par_agence"],
+            [{"label": "Agence Paris", "amount": Decimal("100.00")}],
+        )
+        self.assertNotContains(response, "Agence Lyon")
 
     def test_statistics_aggregate_locations_equipment_clients_and_late_returns(self):
         self.creer_location(

@@ -39,3 +39,6 @@ l’audit des données existantes, les rapports financiers, la PWA et des
 optimisations générales de performance.
 
 Les rappels automatiques sont exécutés par le service Docker « scheduler » à 08:00, heure locale. Après application des migrations, démarrer les services Docker pour l’activer.
+
+chiffre d’affaires des locations terminées et les filtres période/agence
+montants attendus, pénalités et cautions

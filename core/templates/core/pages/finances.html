@@ -1,0 +1,181 @@
+{% extends 'core/templates/base.html' %}
+
+{% block title %}RentTech - Finances{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+    <div class="flex flex-wrap items-end justify-between gap-3">
+        <div>
+            <h1 class="text-2xl font-bold text-renttech-dark">Finances</h1>
+            <p class="mt-1 text-sm text-gray-600">
+                {{ agency_label }} — revenus générés et montants estimés.
+            </p>
+        </div>
+    </div>
+
+    <form method="get" class="bg-white shadow-sm rounded-lg border border-gray-200 p-4 flex flex-wrap items-end gap-3">
+        <div>
+            <label for="finance-start" class="block text-xs font-medium text-gray-600 mb-1">Date de début</label>
+            <input id="finance-start" type="date" name="date_debut" value="{{ date_debut_filter }}"
+                class="px-3 py-2 border border-gray-300 rounded-md text-sm">
+        </div>
+        <div>
+            <label for="finance-end" class="block text-xs font-medium text-gray-600 mb-1">Date de fin</label>
+            <input id="finance-end" type="date" name="date_fin" value="{{ date_fin_filter }}"
+                class="px-3 py-2 border border-gray-300 rounded-md text-sm">
+        </div>
+        {% if request.user.is_superuser %}
+        <div>
+            <label for="finance-agency" class="block text-xs font-medium text-gray-600 mb-1">Agence</label>
+            <select id="finance-agency" name="agence" class="px-3 py-2 border border-gray-300 rounded-md text-sm">
+                <option value="">Toutes les agences</option>
+                {% for agency in agencies %}
+                <option value="{{ agency.pk }}" {% if agency_filter == agency.pk|stringformat:"s" %}selected{% endif %}>
+                    {{ agency.nom }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        <button type="submit"
+            class="px-4 py-2 bg-renttech-primary hover:opacity-90 text-white rounded-md text-sm font-medium">
+            Appliquer
+        </button>
+        <button type="submit" name="format" value="pdf"
+            class="px-4 py-2 bg-renttech-dark hover:opacity-90 text-white rounded-md text-sm font-medium">
+            Télécharger le rapport PDF
+        </button>
+        <a href="{% url 'core:finances' %}" class="px-2 py-2 text-sm text-gray-600 hover:underline">
+            Réinitialiser
+        </a>
+    </form>
+
+    <p class="text-xs text-gray-500">
+        Les revenus terminés sont datés selon le retour réel (ou l’échéance prévue si elle est absente); les locations en cours selon leur échéance prévue.
+        Les cautions et montants attendus sont des estimations : l’application ne suit pas les encaissements ni les remboursements.
+    </p>
+
+    <section class="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-6 gap-4" aria-label="Synthèse financière">
+        <div class="bg-white border border-emerald-200 rounded-lg p-5 shadow-sm">
+            <p class="text-sm text-gray-500">Chiffre d’affaires généré</p>
+            <p class="mt-1 text-2xl font-bold text-emerald-700">{{ stats.chiffre_affaires|floatformat:2 }} €</p>
+            <p class="mt-1 text-xs text-gray-500">Locations terminées, pénalités incluses</p>
+        </div>
+        <div class="bg-white border border-blue-200 rounded-lg p-5 shadow-sm">
+            <p class="text-sm text-gray-500">Entrées attendues</p>
+            <p class="mt-1 text-2xl font-bold text-blue-700">{{ stats.montant_en_attente|floatformat:2 }} €</p>
+            <p class="mt-1 text-xs text-gray-500">Locations en cours et pénalités accumulées</p>
+        </div>
+        <div class="bg-white border border-amber-200 rounded-lg p-5 shadow-sm">
+            <p class="text-sm text-gray-500">Pénalités constatées</p>
+            <p class="mt-1 text-2xl font-bold text-amber-700">{{ stats.penalites_generees|floatformat:2 }} €</p>
+            <p class="mt-1 text-xs text-gray-500">Locations terminées</p>
+        </div>
+        <div class="bg-white border border-cyan-200 rounded-lg p-5 shadow-sm">
+            <p class="text-sm text-gray-500">Cautions à restituer sans retard</p>
+            <p class="mt-1 text-2xl font-bold text-cyan-700">{{ stats.cautions_a_restituer_sans_retard|floatformat:2 }} €</p>
+            <p class="mt-1 text-xs text-gray-500">Locations terminées à temps</p>
+        </div>
+        <div class="bg-white border border-teal-200 rounded-lg p-5 shadow-sm">
+            <p class="text-sm text-gray-500">Cautions remboursables estimées</p>
+            <p class="mt-1 text-2xl font-bold text-teal-700">{{ stats.cautions_a_restituer|floatformat:2 }} €</p>
+            <p class="mt-1 text-xs text-gray-500">Solde restant après pénalités</p>
+        </div>
+        <div class="bg-white border border-rose-200 rounded-lg p-5 shadow-sm">
+            <p class="text-sm text-gray-500">Cautions retenues estimées</p>
+            <p class="mt-1 text-2xl font-bold text-rose-700">{{ stats.cautions_retenues|floatformat:2 }} €</p>
+            <p class="mt-1 text-xs text-gray-500">Imputées sur les pénalités constatées</p>
+        </div>
+    </section>
+
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <article class="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+            <h2 class="font-semibold text-gray-900">Revenus par agence</h2>
+            <p class="text-xs text-gray-500 mt-1">Loyers et pénalités des locations terminées.</p>
+            <div class="mt-4 divide-y divide-gray-100">
+                {% for item in stats.revenus_par_agence %}
+                <div class="flex justify-between gap-3 py-2 text-sm">
+                    <span class="text-gray-700">{{ item.label }}</span>
+                    <span class="font-medium text-gray-900">{{ item.amount|floatformat:2 }} €</span>
+                </div>
+                {% empty %}
+                <p class="py-2 text-sm text-gray-500">Aucune donnée pour cette période.</p>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+            <h2 class="font-semibold text-gray-900">Revenus par matériel</h2>
+            <p class="text-xs text-gray-500 mt-1">Loyers calculés avec le tarif enregistré et la durée prévue, hors pénalités.</p>
+            <div class="mt-4 divide-y divide-gray-100">
+                {% for item in stats.revenus_par_equipement %}
+                <div class="flex justify-between gap-3 py-2 text-sm">
+                    <span class="text-gray-700">{{ item.label }}</span>
+                    <span class="font-medium text-gray-900">{{ item.amount|floatformat:2 }} €</span>
+                </div>
+                {% empty %}
+                <p class="py-2 text-sm text-gray-500">Aucune donnée pour cette période.</p>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+            <h2 class="font-semibold text-gray-900">Revenus par client</h2>
+            <p class="text-xs text-gray-500 mt-1">Loyers et pénalités des locations terminées.</p>
+            <div class="mt-4 divide-y divide-gray-100">
+                {% for item in stats.revenus_par_client %}
+                <div class="flex justify-between gap-3 py-2 text-sm">
+                    <span class="text-gray-700">{{ item.label }}</span>
+                    <span class="font-medium text-gray-900">{{ item.amount|floatformat:2 }} €</span>
+                </div>
+                {% empty %}
+                <p class="py-2 text-sm text-gray-500">Aucune donnée pour cette période.</p>
+                {% endfor %}
+            </div>
+        </article>
+    </section>
+
+    <section class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+        <div class="p-5">
+            <h2 class="font-semibold text-gray-900">Entrées financières en attente</h2>
+            <p class="text-xs text-gray-500 mt-1">
+                Le montant attendu additionne le loyer et les pénalités enregistrées ou accumulées à ce jour.
+            </p>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                    <tr>
+                        <th class="px-4 py-3">Location</th>
+                        <th class="px-4 py-3">Agence</th>
+                        <th class="px-4 py-3">Client</th>
+                        <th class="px-4 py-3">Échéance</th>
+                        <th class="px-4 py-3 text-right">Loyer</th>
+                        <th class="px-4 py-3 text-right">Pénalités</th>
+                        <th class="px-4 py-3 text-right">Attendu</th>
+                        <th class="px-4 py-3 text-right">Caution détenue</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for location in stats.locations_en_attente %}
+                    <tr>
+                        <td class="px-4 py-3">#{{ location.id }}</td>
+                        <td class="px-4 py-3">{{ location.agence }}</td>
+                        <td class="px-4 py-3">{{ location.client }}</td>
+                        <td class="px-4 py-3">{{ location.echeance|date:"d/m/Y" }}</td>
+                        <td class="px-4 py-3 text-right">{{ location.loyer|floatformat:2 }} €</td>
+                        <td class="px-4 py-3 text-right">{{ location.penalite|floatformat:2 }} €</td>
+                        <td class="px-4 py-3 text-right font-semibold">{{ location.montant_attendu|floatformat:2 }} €</td>
+                        <td class="px-4 py-3 text-right">{{ location.caution|floatformat:2 }} €</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="px-4 py-6 text-center text-gray-500">Aucune location en cours pour cette période.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}

@@ -12,6 +12,7 @@ urlpatterns = [
         views.statistiques_locations,
         name="statistiques_locations",
     ),
+    path("finances/", views.finances, name="finances"),
     path("notifications/", views.liste_notifications, name="liste_notifications"),
     path(
         "notifications/<int:pk>/ouvrir/",

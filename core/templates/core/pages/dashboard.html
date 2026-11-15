@@ -17,10 +17,11 @@
     </div>
 
     <!-- Grille de Statistiques (Utilisation de la Molécule stat_card) -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {% include 'core/molecules/stat_card.html' with title="Total clients" value=total_clients border_color="border-renttech-primary" %}
         {% include 'core/molecules/stat_card.html' with title="Équipements en stock" value=total_equipements border_color="border-renttech-lightblue" %}
         {% include 'core/molecules/stat_card.html' with title="Locations en cours" value=locations_en_cours border_color="border-amber-500" %}
+        {% include 'core/molecules/stat_card.html' with title="Chiffre d'affaires généré" value=chiffre_affaires|floatformat:2 suffix="€" border_color="border-emerald-500" %}
     </div>
 
     <!-- Actions Rapides (Utilisation des Atomes boutons) -->

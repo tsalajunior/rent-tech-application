@@ -14,6 +14,7 @@ from django.contrib import messages
 from django.db import transaction
 from django.utils.dateparse import parse_date
 from django.utils import timezone
+from django.utils.text import slugify
 from decimal import Decimal, ROUND_HALF_UP
 from .models import (
     Agence,
@@ -32,9 +33,10 @@ from .notifications import (
     notify_event,
 )
 from .statistics import STATUS_CHOICES, build_location_statistics, filter_location_status
+from .financial_statistics import build_financial_statistics
 from django.views.decorators.cache import never_cache
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.shortcuts import get_object_or_404, redirect
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -265,6 +267,238 @@ def statistiques_locations(request):
     )
 
 
+def _format_montant_pdf(montant):
+    return f"{montant:,.2f} €".replace(",", " ").replace(".", ",")
+
+
+def _financial_pdf_response(
+    stats, *, start, end, agency_label, agency_filename, initiated_by
+):
+    buffer = BytesIO()
+    document = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=15 * mm,
+        leftMargin=15 * mm,
+        topMargin=15 * mm,
+        bottomMargin=15 * mm,
+        title="Rapport financier RentTech",
+    )
+    styles = getSampleStyleSheet()
+    logo_path = finders.find("core/images/RentTech_Logo.jpg")
+    if logo_path is None:
+        raise FileNotFoundError("Logo RentTech introuvable pour le rapport financier.")
+    logo = Image(logo_path)
+    logo_scale = min(35 * mm / logo.drawWidth, 20 * mm / logo.drawHeight)
+    logo.drawWidth *= logo_scale
+    logo.drawHeight *= logo_scale
+    elements = [
+        Table(
+            [
+                [
+                    Paragraph(
+                        "Rapport financier RentTech<br/>"
+                        f"<font size='13'>{escape(agency_label)}</font>",
+                        styles["Title"],
+                    ),
+                    logo,
+                ]
+            ],
+            colWidths=[145 * mm, 35 * mm],
+            style=TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                    ("TOPPADDING", (0, 0), (-1, -1), 0),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                ]
+            ),
+        ),
+        Spacer(1, 4 * mm),
+    ]
+    period_label = (
+        f"Du {start:%d/%m/%Y} au {end:%d/%m/%Y}"
+        if start is not None and end is not None
+        else f"Depuis le {start:%d/%m/%Y}"
+        if start is not None
+        else f"Jusqu'au {end:%d/%m/%Y}"
+        if end is not None
+        else "Toutes les dates"
+    )
+    elements.extend(
+        [
+            Paragraph(f"Période : {escape(period_label)}", styles["Normal"]),
+            Paragraph(f"Agence : {escape(agency_label)}", styles["Normal"]),
+            Paragraph(
+                f"Généré le : {timezone.localtime():%d/%m/%Y à %H:%M} "
+                f"— {escape(initiated_by)}",
+                styles["Normal"],
+            ),
+            Paragraph(
+                "Montants générés ou estimés ; aucun encaissement n'est suivi dans l'application.",
+                styles["Normal"],
+            ),
+            Spacer(1, 4 * mm),
+        ]
+    )
+
+    def add_table(title, headers, rows, widths):
+        elements.append(Paragraph(escape(title), styles["Heading2"]))
+        table = Table([headers, *rows], colWidths=widths, repeatRows=1)
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f172a")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#d1d5db")),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ]
+            )
+        )
+        elements.extend([table, Spacer(1, 4 * mm)])
+
+    summary_rows = [
+        ["Chiffre d'affaires généré", _format_montant_pdf(stats["chiffre_affaires"])],
+        ["Loyers générés", _format_montant_pdf(stats["loyers_generes"])],
+        ["Pénalités constatées (locations terminées)", _format_montant_pdf(stats["penalites_generees"])],
+        ["Loyers en attente", _format_montant_pdf(stats["loyers_en_attente"])],
+        ["Pénalités en attente", _format_montant_pdf(stats["penalites_en_attente"])],
+        ["Total attendu sur les locations en cours", _format_montant_pdf(stats["montant_en_attente"])],
+        ["Cautions à restituer sans retard", _format_montant_pdf(stats["cautions_a_restituer_sans_retard"])],
+        ["Cautions remboursables estimées", _format_montant_pdf(stats["cautions_a_restituer"])],
+        ["Cautions retenues estimées", _format_montant_pdf(stats["cautions_retenues"])],
+    ]
+    add_table("Synthèse", ["Indicateur", "Montant"], summary_rows, [115 * mm, 60 * mm])
+
+    for title, key in (
+        ("Revenus par agence", "revenus_par_agence"),
+        ("Revenus par client", "revenus_par_client"),
+        ("Loyers par matériel (hors pénalités)", "revenus_par_equipement"),
+    ):
+        rows = [
+            [escape(str(item["label"])), _format_montant_pdf(item["amount"])]
+            for item in stats[key]
+        ] or [["Aucune donnée", "0,00 €"]]
+        add_table(title, ["Détail", "Montant"], rows, [115 * mm, 60 * mm])
+
+    pending_rows = [
+        [
+            str(item["id"]),
+            escape(item["agence"]),
+            escape(item["client"]),
+            item["echeance"].strftime("%d/%m/%Y"),
+            _format_montant_pdf(item["loyer"]),
+            _format_montant_pdf(item["penalite"]),
+            _format_montant_pdf(item["montant_attendu"]),
+        ]
+        for item in stats["locations_en_attente"]
+    ] or [["—", "—", "Aucune location en cours", "—", "0,00 €", "0,00 €", "0,00 €"]]
+    add_table(
+        "Locations en cours — montants attendus",
+        ["ID", "Agence", "Client", "Échéance", "Loyer", "Pénalité", "Attendu"],
+        pending_rows,
+        [10 * mm, 28 * mm, 34 * mm, 22 * mm, 24 * mm, 24 * mm, 28 * mm],
+    )
+
+    document.build(elements)
+    response = HttpResponse(buffer.getvalue(), content_type="application/pdf")
+    agency_slug = slugify(agency_filename) or "sans-agence"
+    report_date = timezone.localdate().isoformat()
+    filename = f"rapport-financier-{report_date}-{agency_slug}.pdf"
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
+@login_required
+@never_cache
+def finances(request):
+    user = request.user
+    start_text = request.GET.get("date_debut", "").strip()
+    end_text = request.GET.get("date_fin", "").strip()
+    start_date = parse_date(start_text) if start_text else None
+    end_date = parse_date(end_text) if end_text else None
+    valid_filters = not (
+        (start_text and start_date is None)
+        or (end_text and end_date is None)
+        or (start_date and end_date and start_date > end_date)
+    )
+    if not valid_filters:
+        messages.error(
+            request,
+            "La période financière est invalide. Vérifiez les dates saisies.",
+        )
+
+    agencies = Agence.objects.order_by("nom") if user.is_superuser else Agence.objects.none()
+    agency_filter = ""
+    agency_label = "Administration centrale — toutes les agences"
+    agency_filename = "centrale"
+    locations = _agence_queryset_for_user(user, Location.objects.all())
+    if user.is_superuser:
+        agency_filter = request.GET.get("agence", "").strip()
+        if agency_filter:
+            selected_agency = (
+                Agence.objects.filter(pk=agency_filter).first()
+                if agency_filter.isdigit()
+                else None
+            )
+            if selected_agency is None:
+                valid_filters = False
+                agency_label = "Sélection invalide"
+                messages.error(request, "L'agence sélectionnée est invalide.")
+            else:
+                locations = locations.filter(agence=selected_agency)
+                agency_label = selected_agency.nom
+                agency_filename = selected_agency.nom
+    else:
+        try:
+            agency = user.profil.agence
+        except AttributeError:
+            agency = None
+        agency_label = agency.nom if agency else "Aucune agence attribuée"
+        agency_filename = agency.nom if agency else "sans-agence"
+
+    if not valid_filters:
+        locations = locations.none()
+
+    stats = build_financial_statistics(
+        locations,
+        today=timezone.localdate(),
+        start=start_date,
+        end=end_date,
+    )
+    if request.GET.get("format") == "pdf" and valid_filters:
+        return _financial_pdf_response(
+            stats,
+            start=start_date,
+            end=end_date,
+            agency_label=agency_label,
+            agency_filename=agency_filename,
+            initiated_by=user.get_full_name().strip() or user.get_username(),
+        )
+
+    return render(
+        request,
+        "core/pages/finances.html",
+        {
+            "stats": stats,
+            "agencies": agencies,
+            "agency_filter": agency_filter,
+            "agency_label": agency_label,
+            "date_debut_filter": start_text,
+            "date_fin_filter": end_text,
+            "valid_filters": valid_filters,
+        },
+    )
+
+
 @login_required
 @never_cache
 def liste_notifications(request):
@@ -314,6 +548,19 @@ def dashboard(request):
     - Vue filtrée par agence pour l'employé simple.
     """
     user = request.user
+    locations_terminees = _agence_queryset_for_user(
+        user,
+        Location.objects.filter(
+            Q(retour_reelle__isnull=False) | Q(statut="terminee")
+        ).exclude(statut="annulee"),
+    )
+    montants_generes = locations_terminees.aggregate(
+        loyers=Sum("montant_total"),
+        penalites=Sum("penalite_retard"),
+    )
+    chiffre_affaires = (montants_generes["loyers"] or Decimal("0.00")) + (
+        montants_generes["penalites"] or Decimal("0.00")
+    )
 
     # if user.is_superuser:
     #     # Vue globale SuperAdmin
@@ -385,6 +632,7 @@ def dashboard(request):
         "total_clients": total_clients,
         "total_equipements": total_equipements,
         "locations_en_cours": locations_en_cours,
+        "chiffre_affaires": chiffre_affaires,
         "agence_libelle": agence_libelle,
     }
     return render(request, "core/pages/dashboard.html", context)
