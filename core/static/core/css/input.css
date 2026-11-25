@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 @theme {
-  --color-renttech-dark: #1E1A4D;
-  --color-renttech-primary: #193CB8;
-  --color-renttech-lightblue: #155DFC;
-  --color-renttech-offwhite: #FAFAF9;
+  --color-renttech-dark: #0f172a;
+  --color-renttech-primary: #2563eb;
+  --color-renttech-lightblue: #38bdf8;
+  --color-renttech-offwhite: #f8fafc;
   --color-renttech-darktext: #1C1917;
 }

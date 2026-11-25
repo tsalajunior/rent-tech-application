@@ -1,6 +1,7 @@
 import calendar
 import csv
 from io import BytesIO, StringIO
+from pathlib import Path
 
 from django.contrib.staticfiles import finders
 from django.shortcuts import render
@@ -54,6 +55,7 @@ from xml.sax.saxutils import escape
 from .forms import (
     ClientForm,
     EquipementForm,
+    AdminUserCreationForm,
     AdminUserForm,
     UserProfileForm,
     CategorieForm,
@@ -66,6 +68,23 @@ RENTTECH_NAME = "RentTech"
 RENTTECH_DESCRIPTION = (
     "Système de location de matériels informatiques et électroniques."
 )
+
+
+@never_cache
+def service_worker(request):
+    service_worker_path = (
+        Path(__file__).resolve().parent
+        / "static"
+        / "core"
+        / "js"
+        / "service-worker.js"
+    )
+    response = HttpResponse(
+        service_worker_path.read_text(encoding="utf-8"),
+        content_type="application/javascript",
+    )
+    response["Service-Worker-Allowed"] = "/"
+    return response
 
 
 def _location_accessible(user, location):
@@ -1180,6 +1199,32 @@ def exporter_utilisateurs_csv(request):
             "Date de création",
         ),
         rows,
+    )
+
+
+@login_required
+@never_cache
+def utilisateur_ajouter(request):
+    if not request.user.is_superuser:
+        return redirect("core:dashboard")
+
+    if request.method == "POST":
+        form = AdminUserCreationForm(request.POST)
+        if form.is_valid():
+            with transaction.atomic():
+                utilisateur = form.save()
+            messages.success(
+                request,
+                f"L'utilisateur {utilisateur.username} a été créé avec succès.",
+            )
+            return redirect("core:liste_utilisateurs")
+    else:
+        form = AdminUserCreationForm()
+
+    return render(
+        request,
+        "core/pages/utilisateur_form.html",
+        {"form": form, "creation": True},
     )
 
 

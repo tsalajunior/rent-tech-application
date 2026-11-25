@@ -1,17 +1,26 @@
 {% extends 'core/templates/base.html' %}
 
-{% block title %}RentTech - Modifier un utilisateur{% endblock %}
+{% block title %}RentTech - {% if creation %}Créer un utilisateur{% else %}Modifier un utilisateur{% endif %}{% endblock %}
 
 {% block content %}
 <div class="max-w-xl mx-auto bg-white shadow rounded-lg p-8 border border-gray-100 mt-6 mb-12">
     <div class="mb-6 border-b border-gray-100 pb-4">
+        {% if creation %}
+        <h1 class="text-xl font-bold text-renttech-dark">Créer un utilisateur</h1>
+        <p class="text-gray-500 text-sm">Créez un compte employé et rattachez-le à une agence.</p>
+        {% else %}
         <h1 class="text-xl font-bold text-renttech-dark">Modifier l'utilisateur</h1>
         <p class="text-gray-500 text-sm">Mise à jour des accès de <span class="font-semibold text-renttech-primary">{{ utilisateur.username }}</span></p>
+        {% endif %}
     </div>
 
     <form method="POST" class="space-y-4">
         {% csrf_token %}
-        
+
+        {% if form.non_field_errors %}
+        <div class="text-red-600 text-sm">{{ form.non_field_errors }}</div>
+        {% endif %}
+
         <div>
             <label for="{{ form.username.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">Nom d'utilisateur</label>
             {{ form.username }}
@@ -36,6 +45,20 @@
             {% if form.email.errors %}<p class="text-red-600 text-xs mt-1">{{ form.email.errors.0 }}</p>{% endif %}
         </div>
 
+        {% if creation %}
+        <div>
+            <label for="{{ form.password1.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">Mot de passe initial</label>
+            {{ form.password1 }}
+            {% if form.password1.errors %}<p class="text-red-600 text-xs mt-1">{{ form.password1.errors.0 }}</p>{% endif %}
+        </div>
+
+        <div>
+            <label for="{{ form.password2.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">Confirmer le mot de passe</label>
+            {{ form.password2 }}
+            {% if form.password2.errors %}<p class="text-red-600 text-xs mt-1">{{ form.password2.errors.0 }}</p>{% endif %}
+        </div>
+        {% endif %}
+
         <div>
             <label for="{{ form.agence.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">Agence</label>
             {{ form.agence }}
@@ -52,7 +75,7 @@
                 Annuler
             </a>
             <button type="submit" class="px-4 py-2 bg-renttech-primary hover:opacity-90 text-white rounded-md text-sm font-medium transition shadow-sm">
-                Enregistrer
+                {% if creation %}Créer le compte{% else %}Enregistrer{% endif %}
             </button>
         </div>
     </form>

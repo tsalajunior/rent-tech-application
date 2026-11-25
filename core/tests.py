@@ -1,9 +1,19 @@
 import csv
+import json
+import struct
 from io import StringIO
+from pathlib import Path
 
+from django.conf import settings
 from django.core.management import call_command
 from django.template.loader import get_template
-from django.test import RequestFactory, SimpleTestCase, TestCase
+from django.test import (
+    Client as DjangoTestClient,
+    RequestFactory,
+    SimpleTestCase,
+    TestCase,
+    override_settings,
+)
 from django.urls import resolve, reverse
 from types import SimpleNamespace
 from datetime import date, timedelta
@@ -58,6 +68,52 @@ class LocationUrlTests(SimpleTestCase):
         self.assertEqual(
             resolve("/locations/12/prolonger/").url_name, "etendre_location"
         )
+
+
+class PwaTests(SimpleTestCase):
+    def test_manifest_declares_installable_app_and_valid_icon_sizes(self):
+        manifest_path = (
+            Path(__file__).resolve().parent
+            / "static"
+            / "core"
+            / "manifest.webmanifest"
+        )
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(manifest["start_url"], "/")
+        self.assertEqual(manifest["scope"], "/")
+        self.assertEqual(manifest["display"], "standalone")
+        self.assertEqual(
+            {icon["sizes"] for icon in manifest["icons"] if icon["purpose"] == "any"},
+            {"192x192", "512x512"},
+        )
+
+        for icon in manifest["icons"]:
+            icon_path = manifest_path.parent / icon["src"]
+            with icon_path.open("rb") as icon_file:
+                header = icon_file.read(24)
+            self.assertEqual(header[:8], b"\x89PNG\r\n\x1a\n")
+            self.assertEqual(
+                struct.unpack(">II", header[16:24]),
+                tuple(int(dimension) for dimension in icon["sizes"].split("x")),
+            )
+
+    def test_login_page_uses_local_css_and_manifest(self):
+        response = self.client.get(reverse("login"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'href="/static/core/manifest.webmanifest"')
+        self.assertContains(response, 'href="/static/core/css/output.css"')
+        self.assertNotContains(response, "cdn.tailwindcss.com")
+
+    def test_service_worker_is_root_scoped_and_not_cached(self):
+        response = self.client.get("/service-worker.js")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Service-Worker-Allowed"], "/")
+        self.assertIn("no-store", response["Cache-Control"])
+        self.assertContains(response, 'if (request.mode === "navigate")')
+        self.assertContains(response, 'url.pathname.startsWith("/static/")')
 
 
 class LocationTemplateTests(SimpleTestCase):
@@ -1039,6 +1095,112 @@ class AuthorizationRegressionTests(TestCase):
         self.assertRedirects(response, reverse("core:liste_utilisateurs"))
         self.employee.refresh_from_db()
         self.assertFalse(self.employee.is_active)
+
+    def test_user_list_offers_creation_and_export_actions(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("core:liste_utilisateurs"))
+
+        self.assertContains(response, reverse("core:utilisateur_ajouter"))
+        self.assertContains(response, reverse("core:exporter_utilisateurs_csv"))
+
+    def test_only_superusers_can_open_user_creation(self):
+        self.client.force_login(self.employee)
+
+        response = self.client.get(reverse("core:utilisateur_ajouter"))
+
+        self.assertRedirects(response, reverse("core:dashboard"))
+        response = self.client.post(
+            reverse("core:utilisateur_ajouter"),
+            {"username": "unauthorized-user"},
+        )
+        self.assertRedirects(response, reverse("core:dashboard"))
+        self.assertFalse(User.objects.filter(username="unauthorized-user").exists())
+
+    def test_user_creation_assigns_agency_and_sets_password(self):
+        self.client.force_login(self.admin)
+        form_response = self.client.get(reverse("core:utilisateur_ajouter"))
+        self.assertContains(form_response, "Créer un utilisateur")
+        self.assertContains(form_response, "Mot de passe initial")
+
+        response = self.client.post(
+            reverse("core:utilisateur_ajouter"),
+            {
+                "username": "new-employee",
+                "first_name": "Nouvel",
+                "last_name": "Employe",
+                "email": "new-employee@example.test",
+                "agence": self.agence.pk,
+                "is_active": "on",
+                "password1": "Initial-Strong-Password-908!",
+                "password2": "Initial-Strong-Password-908!",
+            },
+        )
+
+        self.assertRedirects(response, reverse("core:liste_utilisateurs"))
+        created_user = User.objects.get(username="new-employee")
+        self.assertTrue(created_user.is_active)
+        self.assertFalse(created_user.is_staff)
+        self.assertFalse(created_user.is_superuser)
+        self.assertTrue(
+            created_user.check_password("Initial-Strong-Password-908!")
+        )
+        self.assertEqual(created_user.profil.agence_id, self.agence.pk)
+
+    def test_user_creation_rejects_mismatched_passwords(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("core:utilisateur_ajouter"),
+            {
+                "username": "invalid-new-employee",
+                "first_name": "Nouvel",
+                "last_name": "Employe",
+                "email": "invalid-new-employee@example.test",
+                "agence": self.agence.pk,
+                "password1": "Initial-Strong-Password-908!",
+                "password2": "Different-Strong-Password-908!",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("password2", response.context["form"].errors)
+        self.assertFalse(
+            User.objects.filter(username="invalid-new-employee").exists()
+        )
+
+
+class BrowserSessionSecurityTests(TestCase):
+    def test_previous_persistent_session_cookie_is_not_reused(self):
+        user = User.objects.create_user(
+            username="legacy-session-user",
+            password="test-password",
+        )
+        with override_settings(SESSION_COOKIE_NAME="sessionid"):
+            previous_browser = DjangoTestClient()
+            previous_browser.force_login(user)
+            legacy_cookie = previous_browser.cookies["sessionid"].value
+
+        reopened_browser = DjangoTestClient()
+        reopened_browser.cookies["sessionid"] = legacy_cookie
+        response = reopened_browser.get(reverse("core:dashboard"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("login"), response.url)
+
+    def test_login_cookie_expires_when_browser_session_ends(self):
+        User.objects.create_user(
+            username="session-user",
+            password="test-password",
+        )
+
+        response = self.client.post(
+            reverse("login"),
+            {"username": "session-user", "password": "test-password"},
+        )
+
+        self.assertRedirects(response, reverse("core:dashboard"))
+        session_cookie = response.cookies[settings.SESSION_COOKIE_NAME]
+        self.assertEqual(session_cookie["max-age"], "")
+        self.assertEqual(session_cookie["expires"], "")
 
 
 class CsvExportTests(TestCase):

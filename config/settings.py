@@ -18,7 +18,10 @@ SECRET_KEY = "django-insecure-*bl_q$$t-0k*ih835%#clu5i1%n00ra#xxxjyg=q%uwk0vy5!h
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", "192.168.1.48", "192.168.1.12"]
+ALLOWED_HOSTS = ["127.0.0.1", "localhost", "192.168.1.10"]
+
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_COOKIE_NAME = "renttech_sessionid"
 
 
 # Application definition
@@ -115,7 +118,7 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 STATICFILES_DIRS = [
     BASE_DIR / "core/static",
 ]

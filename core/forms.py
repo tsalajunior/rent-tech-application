@@ -1,4 +1,5 @@
 from django import forms
+from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -141,6 +142,79 @@ class AdminUserForm(forms.ModelForm):
             profil, created = ProfilEmploye.objects.get_or_create(user=user)
             profil.agence = agence
             profil.save()
+        return user
+
+
+class AdminUserCreationForm(UserCreationForm):
+    agence = forms.ModelChoiceField(
+        queryset=Agence.objects.all(),
+        widget=forms.Select(
+            attrs={
+                "class": "w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-renttech-primary focus:outline-none text-sm"
+            }
+        ),
+        label="Agence",
+    )
+
+    class Meta:
+        model = User
+        fields = (
+            "username",
+            "first_name",
+            "last_name",
+            "email",
+            "is_active",
+        )
+        widgets = {
+            "username": forms.TextInput(
+                attrs={
+                    "class": "w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-renttech-primary focus:outline-none text-sm"
+                }
+            ),
+            "first_name": forms.TextInput(
+                attrs={
+                    "class": "w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-renttech-primary focus:outline-none text-sm"
+                }
+            ),
+            "last_name": forms.TextInput(
+                attrs={
+                    "class": "w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-renttech-primary focus:outline-none text-sm"
+                }
+            ),
+            "email": forms.EmailInput(
+                attrs={
+                    "class": "w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-renttech-primary focus:outline-none text-sm"
+                }
+            ),
+            "is_active": forms.CheckboxInput(
+                attrs={
+                    "class": "h-4 w-4 text-renttech-primary focus:ring-renttech-primary border-gray-300 rounded"
+                }
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["is_active"].initial = True
+        password_class = (
+            "w-full px-4 py-2 border border-gray-300 rounded-md "
+            "focus:ring-2 focus:ring-renttech-primary focus:outline-none text-sm"
+        )
+        self.fields["password1"].widget.attrs.update(
+            {"class": password_class, "autocomplete": "new-password"}
+        )
+        self.fields["password2"].widget.attrs.update(
+            {"class": password_class, "autocomplete": "new-password"}
+        )
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        if commit:
+            user.save()
+            ProfilEmploye.objects.create(
+                user=user,
+                agence=self.cleaned_data["agence"],
+            )
         return user
 
 

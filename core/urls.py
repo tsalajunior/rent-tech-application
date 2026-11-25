@@ -6,6 +6,7 @@ app_name = "core"
 
 urlpatterns = [
     path("logout/", LogoutView.as_view(next_page="core:login"), name="logout"),
+    path("service-worker.js", views.service_worker, name="service_worker"),
     path("", views.dashboard, name="dashboard"),
     path(
         "statistiques/locations/",
@@ -53,6 +54,11 @@ urlpatterns = [
         "utilisateurs/export.csv",
         views.exporter_utilisateurs_csv,
         name="exporter_utilisateurs_csv",
+    ),
+    path(
+        "utilisateurs/ajouter/",
+        views.utilisateur_ajouter,
+        name="utilisateur_ajouter",
     ),
     path(
         "utilisateurs/<int:pk>/modifier/",

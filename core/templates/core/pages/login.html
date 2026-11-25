@@ -6,27 +6,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RentTech - Connexion</title>
-    <!-- Fichier CSS compilé par Tailwind -->
-    <link rel="icon" href="{% static 'core/images/RentTech_Logo.jpg' %}" type="image/jpg">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="manifest" href="{% static 'core/manifest.webmanifest' %}">
+    <link rel="icon" href="{% static 'core/images/renttech-icon-192.png' %}" type="image/png">
+    <link rel="apple-touch-icon" href="{% static 'core/images/renttech-icon-180.png' %}">
     <link rel="stylesheet" href="{% static 'core/css/output.css' %}">
-    <!-- CDN Tailwind CSS pour un test immédiat et garanti -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        renttech: {
-                            dark: '#0f172a',
-                            primary: '#2563eb',
-                            lightblue: '#38bdf8',
-                            offwhite: '#f8fafc',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
 </head>
 
 <body
@@ -88,6 +72,7 @@
             window.history.replaceState(null, null, window.location.pathname);
         }
     </script>
+    <script src="{% static 'core/js/register-service-worker.js' %}" defer></script>
 </body>
 
 </html>
