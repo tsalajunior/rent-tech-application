@@ -1033,31 +1033,33 @@ def client_ajouter(request):
 @login_required
 @never_cache
 def client_modifier(request, pk):
-    client = get_object_or_404(Client, pk=pk)
     user = request.user
 
-    # Contrôle d'accès agence
     if not user.is_superuser:
         try:
-            if client.agence != user.profil.agence:
-                return redirect("core:liste_clients")
+            agence_id = user.profil.agence_id
         except AttributeError:
             return redirect("core:liste_clients")
+        if not agence_id:
+            return redirect("core:liste_clients")
+        clients = Client.objects.filter(agence_id=agence_id)
+    else:
+        agence_id = None
+        clients = Client.objects.all()
+
+    client = get_object_or_404(clients, pk=pk)
 
     if request.method == "POST":
         form = ClientForm(request.POST, instance=client)
+        if not user.is_superuser:
+            form.fields["agence"].queryset = Agence.objects.filter(pk=agence_id)
         if form.is_valid():
             form.save()
             return redirect("core:liste_clients")
     else:
         form = ClientForm(instance=client)
         if not user.is_superuser:
-            try:
-                form.fields["agence"].queryset = Agence.objects.filter(
-                    id=user.profil.agence.id
-                )
-            except AttributeError:
-                pass
+            form.fields["agence"].queryset = Agence.objects.filter(pk=agence_id)
 
     return render(
         request,
@@ -1069,9 +1071,13 @@ def client_modifier(request, pk):
 @login_required
 @never_cache
 def client_supprimer(request, pk):
+    if not request.user.is_superuser:
+        return redirect("core:dashboard")
     client = get_object_or_404(Client, pk=pk)
 
-    # 🔒 Vérifier si le client a des locations via le modèle Location directement
+    if request.method != "POST":
+        return redirect("core:liste_clients")
+
     if Location.objects.filter(client=client).exists():
         messages.error(
             request,
@@ -1079,11 +1085,8 @@ def client_supprimer(request, pk):
         )
         return redirect("core:liste_clients")
 
-    if request.method == "POST":
-        client.delete()
-        messages.success(request, "Le client a été supprimé avec succès.")
-        return redirect("core:liste_clients")
-
+    client.delete()
+    messages.success(request, "Le client a été supprimé avec succès.")
     return redirect("core:liste_clients")
 
 
@@ -1207,6 +1210,8 @@ def utilisateur_modifier(request, pk):
 def utilisateur_toggle_status(request, pk):
     if not request.user.is_superuser:
         return redirect("core:dashboard")
+    if request.method != "POST":
+        return redirect("core:liste_utilisateurs")
 
     user_obj = get_object_or_404(User, pk=pk)
     # Empêcher l'admin de se désactiver lui-même par erreur
@@ -1331,6 +1336,8 @@ def categorie_supprimer(request, pk):
 @login_required
 @never_cache
 def liste_agences(request):
+    if not request.user.is_superuser:
+        return redirect("core:dashboard")
     agences = Agence.objects.all()
     return render(request, "core/pages/liste_agences.html", {"agences": agences})
 
@@ -1338,6 +1345,8 @@ def liste_agences(request):
 @login_required
 @never_cache
 def exporter_agences_csv(request):
+    if not request.user.is_superuser:
+        return redirect("core:dashboard")
     agences = Agence.objects.order_by("pk")
     rows = (
         (agence.pk, agence.nom, agence.ville, agence.adresse)
@@ -1351,6 +1360,8 @@ def exporter_agences_csv(request):
 @login_required
 @never_cache
 def agence_ajouter(request):
+    if not request.user.is_superuser:
+        return redirect("core:dashboard")
     if request.method == "POST":
         form = AgenceForm(request.POST)
         if form.is_valid():
@@ -1367,6 +1378,8 @@ def agence_ajouter(request):
 @login_required
 @never_cache
 def agence_modifier(request, pk):
+    if not request.user.is_superuser:
+        return redirect("core:dashboard")
     agence = get_object_or_404(Agence, pk=pk)
     if request.method == "POST":
         form = AgenceForm(request.POST, instance=agence)
@@ -1384,17 +1397,23 @@ def agence_modifier(request, pk):
 @login_required
 @never_cache
 def agence_supprimer(request, pk):
-    agence = get_object_or_404(Agence, pk=pk)
+    if not request.user.is_superuser:
+        return redirect("core:dashboard")
+    if request.method != "POST":
+        return redirect("core:liste_agences")
 
-    # Sécurité stricte basée sur la méthode du modèle
-    if agence.a_des_dependances():
-        messages.error(
-            request,
-            f"Action impossible : L'agence « {agence.nom} » possède des données liées (clients, équipements, utilisateurs ou locations) et ne peut pas être supprimée.",
+    with transaction.atomic():
+        agence = get_object_or_404(
+            Agence.objects.select_for_update(), pk=pk
         )
-    else:
-        agence.delete()
-        messages.success(request, "L'agence a été supprimée avec succès.")
+        if agence.a_des_dependances():
+            messages.error(
+                request,
+                f"Action impossible : L'agence « {agence.nom} » possède des données liées (clients, équipements, utilisateurs ou locations) et ne peut pas être supprimée.",
+            )
+        else:
+            agence.delete()
+            messages.success(request, "L'agence a été supprimée avec succès.")
 
     return redirect("core:liste_agences")
 

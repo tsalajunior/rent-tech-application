@@ -84,13 +84,17 @@
                             class="text-renttech-primary hover:underline">Modifier</a>
 
                         {% if u != request.user %}
-                        {% if u.is_active %}
-                        <a href="{% url 'core:utilisateur_toggle_status' u.id %}"
-                            class="text-orange-600 hover:text-orange-800 transition">Désactiver</a>
-                        {% else %}
-                        <a href="{% url 'core:utilisateur_toggle_status' u.id %}"
-                            class="text-green-600 hover:text-green-800 transition">Activer</a>
-                        {% endif %}
+                        <form method="post" action="{% url 'core:utilisateur_toggle_status' u.id %}"
+                            class="inline">
+                            {% csrf_token %}
+                            {% if u.is_active %}
+                            <button type="submit"
+                                class="text-orange-600 hover:text-orange-800 transition">Désactiver</button>
+                            {% else %}
+                            <button type="submit"
+                                class="text-green-600 hover:text-green-800 transition">Activer</button>
+                            {% endif %}
+                        </form>
                         {% endif %}
                     </td>
                 </tr>

@@ -83,18 +83,20 @@
                                 class="font-semibold text-gray-800">« {{ agence.nom }} »</span> ? Cette action est irréversible.
                         </p>
 
-                        <div class="flex justify-end space-x-3">
+                        <form method="post" action="{% url 'core:agence_supprimer' agence.id %}"
+                            class="flex justify-end space-x-3">
+                            {% csrf_token %}
                             <button type="button"
                                 onclick="document.getElementById('delete_modal_{{ agence.id }}').close()"
                                 class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm font-medium transition">
                                 Annuler
                             </button>
 
-                            <a href="{% url 'core:agence_supprimer' agence.id %}"
+                            <button type="submit"
                                 class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition shadow-sm">
                                 Oui, supprimer
-                            </a>
-                        </div>
+                            </button>
+                        </form>
                     </div>
                 </dialog>
                 {% endif %}

@@ -910,6 +910,137 @@ class LocationLifecycleIntegrationTests(TestCase):
         self.assertEqual(location.montant_total, Decimal("30.00"))
 
 
+class AuthorizationRegressionTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            username="central-admin",
+            email="central-admin@example.test",
+            password="test-password",
+        )
+        self.agence = Agence.objects.create(
+            nom="Agence test", ville="Paris", adresse="1 rue test"
+        )
+        self.autre_agence = Agence.objects.create(
+            nom="Autre agence", ville="Lyon", adresse="2 rue test"
+        )
+        self.employee = User.objects.create_user(
+            username="employee", password="test-password"
+        )
+        ProfilEmploye.objects.create(user=self.employee, agence=self.agence)
+        self.client_record = Client.objects.create(
+            nom="Martin",
+            prenom="Alice",
+            email="alice@example.test",
+            telephone="0102030405",
+            agence=self.agence,
+        )
+        self.other_client = Client.objects.create(
+            nom="Durand",
+            prenom="Bob",
+            email="bob@example.test",
+            telephone="0102030406",
+            agence=self.autre_agence,
+        )
+
+    def test_agency_views_are_restricted_to_superusers(self):
+        self.client.force_login(self.employee)
+        requests = (
+            ("get", "core:liste_agences", ()),
+            ("get", "core:exporter_agences_csv", ()),
+            ("get", "core:agence_ajouter", ()),
+            ("get", "core:agence_modifier", (self.agence.pk,)),
+            ("post", "core:agence_supprimer", (self.autre_agence.pk,)),
+        )
+
+        for method, route_name, args in requests:
+            with self.subTest(route=route_name, method=method):
+                response = getattr(self.client, method)(
+                    reverse(route_name, args=args)
+                )
+                self.assertRedirects(response, reverse("core:dashboard"))
+
+        self.assertTrue(Agence.objects.filter(pk=self.autre_agence.pk).exists())
+
+    def test_agency_deletion_requires_post(self):
+        self.client.force_login(self.admin)
+        agence_vide = Agence.objects.create(
+            nom="Agence vide", ville="Nantes", adresse="3 rue test"
+        )
+        delete_url = reverse("core:agence_supprimer", args=[agence_vide.pk])
+
+        response = self.client.get(delete_url)
+        self.assertRedirects(response, reverse("core:liste_agences"))
+        self.assertTrue(Agence.objects.filter(pk=agence_vide.pk).exists())
+
+        response = self.client.post(delete_url)
+        self.assertRedirects(response, reverse("core:liste_agences"))
+        self.assertFalse(Agence.objects.filter(pk=agence_vide.pk).exists())
+
+    def test_employee_cannot_move_client_to_another_agency(self):
+        self.client.force_login(self.employee)
+        response = self.client.post(
+            reverse("core:client_modifier", args=[self.client_record.pk]),
+            {
+                "nom": "Martin modifié",
+                "prenom": "Alice",
+                "email": "alice.updated@example.test",
+                "telephone": "0102030405",
+                "agence": self.autre_agence.pk,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("agence", response.context["form"].errors)
+        self.client_record.refresh_from_db()
+        self.assertEqual(self.client_record.agence_id, self.agence.pk)
+        self.assertEqual(self.client_record.nom, "Martin")
+
+    def test_employee_cannot_delete_clients(self):
+        self.client.force_login(self.employee)
+
+        for client_record in (self.client_record, self.other_client):
+            with self.subTest(client=client_record.pk):
+                response = self.client.post(
+                    reverse("core:client_supprimer", args=[client_record.pk])
+                )
+                self.assertRedirects(response, reverse("core:dashboard"))
+                self.assertTrue(
+                    Client.objects.filter(pk=client_record.pk).exists()
+                )
+
+    def test_superuser_can_delete_client_without_rentals(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("core:client_supprimer", args=[self.client_record.pk])
+        )
+
+        self.assertRedirects(response, reverse("core:liste_clients"))
+        self.assertTrue(Client.objects.filter(pk=self.other_client.pk).exists())
+        self.assertFalse(Client.objects.filter(pk=self.client_record.pk).exists())
+
+    def test_user_status_change_requires_post_and_superuser(self):
+        toggle_url = reverse(
+            "core:utilisateur_toggle_status", args=[self.employee.pk]
+        )
+
+        self.client.force_login(self.employee)
+        response = self.client.post(toggle_url)
+        self.assertRedirects(response, reverse("core:dashboard"))
+        self.employee.refresh_from_db()
+        self.assertTrue(self.employee.is_active)
+
+        self.client.force_login(self.admin)
+        response = self.client.get(toggle_url)
+        self.assertRedirects(response, reverse("core:liste_utilisateurs"))
+        self.employee.refresh_from_db()
+        self.assertTrue(self.employee.is_active)
+
+        response = self.client.post(toggle_url)
+        self.assertRedirects(response, reverse("core:liste_utilisateurs"))
+        self.employee.refresh_from_db()
+        self.assertFalse(self.employee.is_active)
+
+
 class CsvExportTests(TestCase):
     def setUp(self):
         self.admin = User.objects.create_superuser(

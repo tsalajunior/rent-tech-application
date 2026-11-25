@@ -1,0 +1,208 @@
+REVUE DES AUTORISATIONS — RENTTECH
+==================================
+
+Date de la revue : 25 novembre 2026
+Périmètre : application Django, avec priorité aux autorisations, au cloisonnement
+par agence, aux actions de modification et aux interfaces de rapport/export.
+Méthode : revue statique en lecture seule du code et des tests; aucun exploit
+n'a été exécuté et aucun compte, secret ou identifiant d'accès n'est reproduit.
+
+SYNTHESE
+--------
+Quatre défauts confirmés permettent à un utilisateur authentifié d'effectuer
+des opérations qui ne respectent pas uniformément la séparation des rôles et
+des agences :
+
+| # | Gravité | Fichier | Lignes | Constat | Confiance |
+|---|---------|---------|--------|---------|-----------|
+| 1 | MOYENNE | core/views.py | 1331-1398 | La gestion des agences n'est pas réservée au superutilisateur; leur suppression peut être déclenchée par GET. | 10/10 |
+| 2 | MOYENNE | core/views.py, core/forms.py | views.py:1035-1056; forms.py:53-55 | Le formulaire POST de modification d'un client ne limite pas l'agence, ce qui permet son transfert hors de l'agence de l'employé. | 10/10 |
+| 3 | MOYENNE | core/views.py | 1071-1086 | La suppression d'un client ne vérifie ni le rôle ni l'agence de l'utilisateur. | 10/10 |
+| 4 | MOYENNE | core/views.py | 1207-1217 | L'activation/désactivation d'un utilisateur modifie l'état du compte sans exiger POST. | 10/10 |
+
+Un point complémentaire à vérifier concerne l'admin Django : les interfaces
+ModelAdmin ne filtrent pas les données par agence. L'impact dépend des comptes
+staff réellement autorisés à utiliser /admin/.
+
+ETAT APRES CORRECTIONS — 25 NOVEMBRE 2026
+-----------------------------------------
+- Constat 1 corrigé : les vues de gestion et d'export des agences exigent un
+  superutilisateur; la suppression exige POST et verrouille l'agence dans une
+  transaction. Le formulaire de suppression envoie maintenant un POST avec
+  jeton CSRF.
+- Constat 2 corrigé : la modification d'un client est limitée par queryset à
+  l'agence de l'employé, et le choix d'agence est restreint côté serveur pour
+  GET et POST.
+- Constat 3 corrigé : la suppression d'un client est réservée au
+  superutilisateur, conformément à l'interface existante, et exige POST.
+- Constat 4 corrigé : le changement d'état d'un utilisateur exige POST; le
+  formulaire d'interface envoie un POST avec jeton CSRF.
+- Vérification : les 6 tests ciblés d'autorisation et les 70 tests de
+  l'application passent; le contrôle système Django ne signale aucun problème.
+- A VERIFIER : le cloisonnement des ModelAdmin selon les comptes staff réels
+  et les paramètres de l'environnement de production.
+
+DETAIL DES CONSTATS INITIAUX
+----------------------------
+
+1. Gestion des agences insuffisamment protégée
+Gravité : moyenne
+Fichier : core/views.py, lignes 1331-1398
+
+Les vues de liste et d'export des agences exposent les données à tout
+utilisateur connecté. La création et la modification n'exigent pas le rôle de
+superutilisateur. La suppression ne vérifie pas non plus ce rôle et peut
+supprimer une agence sans dépendances dès une requête GET.
+
+Conséquences :
+- un employé peut accéder à des fonctions de gestion centrale;
+- une suppression peut être déclenchée par une simple navigation ou une
+  requête GET lorsqu'elle est possible;
+- la règle de cloisonnement multi-agences n'est pas appliquée à ces vues.
+
+Correction recommandée :
+- réserver la liste centrale, l'export et les opérations CRUD d'agence au
+  superutilisateur;
+- refuser explicitement tout accès non autorisé dans les vues;
+- limiter la suppression à POST protégé par CSRF et confirmer l'absence de
+  dépendances au moment de la suppression.
+
+2. Transfert possible d'un client lors de sa modification
+Gravité : moyenne
+Fichiers : core/views.py, lignes 1035-1056; core/forms.py, lignes 53-55
+
+La vue contrôle l'appartenance du client existant à l'agence de l'employé.
+Cependant, le formulaire reçu en POST est construit sans restreindre le
+queryset du champ agence. La restriction visible lors de l'affichage du
+formulaire n'est donc pas une validation serveur suffisante. Un employé peut
+soumettre une autre agence et déplacer le client hors de son périmètre, y
+compris lorsqu'un historique de locations existe.
+
+Correction recommandée :
+- restreindre le queryset d'agence côté serveur pour GET et POST;
+- pour un employé, imposer l'agence du profil après validation, ou rejeter
+  toute tentative de changement;
+- protéger la cohérence de l'historique des locations lors de toute
+  modification d'agence.
+
+3. Suppression de client sans vérification de périmètre
+Gravité : moyenne
+Fichier : core/views.py, lignes 1071-1086
+
+La vue refuse la suppression lorsqu'un client a déjà une location, mais ne
+vérifie pas que l'utilisateur est superutilisateur ou appartient à l'agence
+du client. Un utilisateur connecté peut donc agir sur un client sans
+autorisation d'agence si celui-ci n'a pas d'historique de location.
+
+Correction recommandée :
+- charger le client depuis un queryset filtré par agence pour un employé;
+- réserver les opérations inter-agences au superutilisateur;
+- effectuer ces vérifications aussi bien avant l'affichage que lors du POST.
+
+4. Changement d'état d'un utilisateur par GET
+Gravité : moyenne
+Fichier : core/views.py, lignes 1207-1217
+
+La vue exige le rôle superutilisateur, mais ne vérifie pas la méthode HTTP
+avant de basculer le champ d'activation. Une requête GET peut donc modifier
+l'état du compte dans une session administrateur. Les protections CSRF sont
+destinées aux requêtes de modification et ne rendent pas acceptable un effet
+de bord sur GET.
+
+Correction recommandée :
+- n'accepter que POST avec protection CSRF;
+- remplacer la bascule implicite par une action explicite d'activation ou de
+  désactivation;
+- conserver le garde-fou empêchant l'administrateur de se désactiver
+  accidentellement.
+
+5. Admin Django : cloisonnement par agence à vérifier
+Fichier : core/admin.py, lignes 16-99
+
+Les ModelAdmin enregistrés ne filtrent pas les objets selon l'agence du
+profil. Django limite l'entrée à l'admin aux comptes staff et applique ses
+permissions, mais ces contrôles ne constituent pas à eux seuls un
+cloisonnement multi-agences. L'exposition effective dépend de la présence et
+des droits de comptes staff non-superutilisateurs.
+
+Vérifications et corrections recommandées :
+- vérifier quels comptes peuvent ouvrir /admin/ et quels droits de modèle
+  leur sont attribués;
+- si des employés peuvent utiliser l'admin, filtrer les querysets et valider
+  les relations par agence dans les ModelAdmin concernés, ou leur interdire
+  l'accès à cette interface;
+- ne pas considérer le filtrage des pages métier comme une protection de
+  l'admin Django.
+
+REGLES CIBLES D'AUTORISATION
+----------------------------
+
+1. Principe général
+- Refuser l'accès par défaut; n'accorder que les droits explicitement prévus
+  pour le rôle.
+- Chaque vérification est faite côté serveur sur chaque route. Les menus, les
+  boutons masqués et les querysets de formulaire seuls ne sont pas des
+  contrôles d'accès suffisants.
+- Vérifier l'accès à l'objet demandé avant de le lire, modifier, supprimer,
+  exporter ou inclure dans un rapport.
+- Un utilisateur sans agence de profil ne voit aucune donnée d'agence et ne
+  peut effectuer aucune opération d'agence.
+
+2. Administration centrale
+- Le superutilisateur peut consulter les données de toutes les agences et
+  utiliser les filtres inter-agences.
+- Lui seul gère les agences, les catégories, les équipements et les comptes
+  d'utilisateurs depuis les vues métier.
+- La modification ou suppression d'une location est réservée au
+  superutilisateur; une location terminée ou annulée reste non modifiable et
+  non supprimable.
+
+3. Employé
+- Un employé est limité à l'agence portée par son profil.
+- Il ne peut ni consulter ni modifier des clients, équipements, locations,
+  notifications, exports ou rapports d'une autre agence.
+- Il peut créer et modifier les données clients uniquement dans son agence,
+  sous réserve des règles métier de conservation de l'historique.
+- Il peut créer une location dans son agence et effectuer les actions métier
+  autorisées sur une location de cette agence (retour, annulation conforme
+  aux conditions applicables, prolongation).
+- Il ne peut pas attribuer un client, un équipement ou une location à une
+  autre agence en manipulant les champs soumis.
+
+4. Cohérence multi-agences
+- Vérifier que le client sélectionné appartient à l'agence de la location.
+- Vérifier que chaque équipement sélectionné appartient à cette même agence
+  et qu'il est disponible.
+- Filtrer les querysets serveur des objets par agence avant de traiter les
+  identifiants transmis par le navigateur.
+- Appliquer le même périmètre aux détails, PDF, exports CSV, notifications,
+  tableaux de bord, statistiques, rapports financiers et à l'admin Django.
+
+5. Méthodes HTTP et actions sensibles
+- GET est réservé à la consultation et ne modifie aucun état.
+- Toute création, modification, suppression, annulation, clôture, prolongation,
+  activation ou désactivation passe par POST avec protection CSRF.
+- Vérifier les droits et l'état métier au moment de la mutation, dans la
+  transaction si plusieurs objets doivent rester cohérents.
+- Les notifications ne sont consultables et modifiables que par leur
+  destinataire.
+
+VERIFICATIONS RESTANTES
+-----------------------
+- Vérifier quels comptes peuvent ouvrir /admin/ et quels droits de modèle
+  leur sont attribués. Si des employés peuvent utiliser cette interface,
+  filtrer les querysets et valider les relations selon leur agence, ou leur
+  retirer l'accès.
+- Compléter les tests d'accès directs pour chaque endpoint et les tests
+  d'isolation des rapports/exports au fil des évolutions.
+- Effectuer une revue des paramètres de sécurité en production et un audit
+  des données existantes.
+
+LIMITES
+------
+Cette revue identifie des défauts à partir du code et des tests disponibles.
+Elle ne confirme pas la configuration réelle du serveur de production, la
+population actuelle des comptes, ni l'état des données en base. Les paramètres
+de production et les autorisations de l'admin Django doivent être vérifiés
+dans l'environnement de déploiement. Aucun identifiant, mot de passe, clé ou
+secret n'est inclus dans ce rapport.
